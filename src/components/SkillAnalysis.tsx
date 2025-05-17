@@ -2,7 +2,6 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import ChartComponent from './ChartComponent';
 import ReportSection from './ReportSection';
 import type { SkillAnalysis as SkillAnalysisType } from '../types';
-import { generatePieChartOption, generateBarChartOption } from '../utils/mockChartData';
 import { loadSampleCSVAndAnalyzeChannels } from '../utils/csvParser';
 import sampleDataCSV from '../assets/sample_data.csv?url';
 import { formatLargeNumber } from '../utils/dataAnalysis';

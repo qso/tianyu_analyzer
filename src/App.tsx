@@ -262,7 +262,6 @@ const App: React.FC = () => {
                   isManualChange={isManualChangeRef.current}
                 />
                 <SummaryRecommendations 
-                  summary={report.summary} 
                   isActive={activeSection === 'summary'} 
                   isManualChange={isManualChangeRef.current}
                 />

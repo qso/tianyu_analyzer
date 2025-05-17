@@ -2,7 +2,6 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import ChartComponent from './ChartComponent';
 import ReportSection from './ReportSection';
 import type { ProductAnalysis as ProductAnalysisType } from '../types';
-import { generateBarChartOption, generatePieChartOption } from '../utils/mockChartData';
 import type { ProductConsumptionAnalysis, ProductRankingData } from '../utils/dataAnalysis';
 import { formatLargeNumber, loadAndAnalyzeProductData } from '../utils/dataAnalysis';
 import type { EChartsOption, BarSeriesOption } from 'echarts';
@@ -334,7 +333,7 @@ const ProductAnalysis: React.FC<ProductAnalysisProps> = React.memo(({ isActive, 
       };
     }
     
-    const { total, proportion } = productData;
+    const { total } = productData;
     
     return {
       title: {
@@ -549,34 +548,7 @@ const ProductAnalysis: React.FC<ProductAnalysisProps> = React.memo(({ isActive, 
   // 生成TOP 20商品柱状图选项
   const top20ProductsBarOption = useMemo(() => generateTop20ProductsBarOption(), [generateTop20ProductsBarOption]);
 
-  // 准备统计数据
-  const statsData = useMemo(() => {
-    if (!productData) return null;
-    
-    return {
-      appearance: {
-        amount: formatLargeNumber(productData.total.appearance),
-        percentage: (productData.proportion.appearance * 100).toFixed(2)
-      },
-      value: {
-        amount: formatLargeNumber(productData.total.value),
-        percentage: (productData.proportion.value * 100).toFixed(2)
-      },
-      total: formatLargeNumber(productData.total.total),
-      dateRange: productData.dates.length > 0 
-        ? `${productData.dates[0]} 至 ${productData.dates[productData.dates.length - 1]}` 
-        : '暂无数据',
-      mainType: productData.proportion.appearance > productData.proportion.value 
-        ? '外观付费' 
-        : '数值付费',
-      mainPercentage: productData.proportion.appearance > productData.proportion.value 
-        ? (productData.proportion.appearance * 100).toFixed(2) 
-        : (productData.proportion.value * 100).toFixed(2),
-      suggestion: productData.proportion.appearance > productData.proportion.value 
-        ? '继续加强外观类商品的开发与运营，尤其是限时外观与稀有皮肤' 
-        : '增强数值类商品的吸引力，推出更多具有实用价值的道具与功能'
-    };
-  }, [productData]);
+  
   
   return (
     <ReportSection id="products" title="商品分析" isActive={isActive} isManualChange={isManualChange}>

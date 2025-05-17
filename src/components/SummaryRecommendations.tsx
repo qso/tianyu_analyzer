@@ -1,15 +1,13 @@
 import React from 'react';
 import ReportSection from './ReportSection';
-import type { SummaryRecommendation } from '../types';
 import { motion } from 'framer-motion';
 
 interface SummaryRecommendationsProps {
-  summary: SummaryRecommendation;
   isActive: boolean;
   isManualChange?: boolean;
 }
 
-const SummaryRecommendations: React.FC<SummaryRecommendationsProps> = ({ summary, isActive, isManualChange }) => {
+const SummaryRecommendations: React.FC<SummaryRecommendationsProps> = ({ isActive, isManualChange }) => {
   // 模拟的建议数据
   const recommendations = [
     {

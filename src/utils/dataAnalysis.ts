@@ -115,7 +115,7 @@ export const calculateTrendLine = (data: { date: string; value: number }[]): { s
   if (n < 2) return { slope: 0, intercept: 0 };
   
   // 将日期转换为数字（天数差）
-  const xValues = data.map((item, index) => index);
+  const xValues = data.map((_, index) => index);
   const yValues = data.map(item => item.value);
   
   // 计算平均值

@@ -74,7 +74,6 @@ const UserAnalysis: React.FC<UserAnalysisProps> = ({ isActive, isManualChange })
     
     // 获取主要消费渠道数据
     const mainChannels = analysisResult.mainChannels || ['活动抽奖', '货币被动兑换', '商城购买', '其他'];
-    const highestChannel = mainChannels[0] || '活动抽奖';
     
     // 计算各用户组在总消费中的占比
     const totalAllConsumption = analysisResult.consumptionData.reduce(
@@ -153,7 +152,7 @@ const UserAnalysis: React.FC<UserAnalysisProps> = ({ isActive, isManualChange })
         ];
         setItemOptions(mockItemOptions);
         setSelectedItem(mockItemOptions[0]);
-        generateMockItemConsumptionData(mockItemOptions[0].value);
+        generateMockItemConsumptionData();
       }
       
       setIsLoading(false);
@@ -170,7 +169,7 @@ const UserAnalysis: React.FC<UserAnalysisProps> = ({ isActive, isManualChange })
         loadItemConsumptionData(selectedOption.value);
       } else {
         // 使用模拟数据
-        generateMockItemConsumptionData(selectedOption.value);
+        generateMockItemConsumptionData();
       }
     }
   };
@@ -183,12 +182,12 @@ const UserAnalysis: React.FC<UserAnalysisProps> = ({ isActive, isManualChange })
       setItemConsumptionData(data);
     } else {
       // 如果没有该物品的数据，生成模拟数据
-      generateMockItemConsumptionData(itemName);
+      generateMockItemConsumptionData();
     }
   };
   
   // 生成模拟物品消费数据
-  const generateMockItemConsumptionData = (itemName: string | number) => {
+  const generateMockItemConsumptionData = () => {
     const userGroups = ['土豪', '大R', '中R', '小R', '平民'];
     const totalConsumption = 520000; // 模拟总消费额
     
@@ -227,7 +226,6 @@ const UserAnalysis: React.FC<UserAnalysisProps> = ({ isActive, isManualChange })
   const generateUserConsumptionChartOption = (): EChartsOption => {
     // 使用从分析结果中获取的数据
     const userGroups = analysisResult.consumptionData.map(item => item.userGroup);
-    const consumptionData = analysisResult.consumptionData.map(item => Math.round(item.totalConsumption));
     const avgConsumptionData = analysisResult.consumptionData.map(item => item.avgConsumption);
     
     // 获取主要渠道名称
@@ -401,8 +399,6 @@ const UserAnalysis: React.FC<UserAnalysisProps> = ({ isActive, isManualChange })
   const generateUserPurchaseChartOption = (): EChartsOption => {
     // 使用从分析结果中获取的数据
     const userGroups = analysisResult.purchaseData.map(item => item.userGroup);
-    const purchaseCountData = analysisResult.purchaseData.map(item => item.userCount);
-    
     // 获取主要渠道名称
     const channels = analysisResult.mainChannels || ['活动抽奖', '货币被动兑换', '商城购买', '其他'];
     
@@ -543,9 +539,6 @@ const UserAnalysis: React.FC<UserAnalysisProps> = ({ isActive, isManualChange })
         color: userGroupColors[item.userGroup as keyof typeof userGroupColors] || '#73c0de'
       }
     }));
-    
-    // 计算总消费额
-    const totalConsumption = itemConsumptionData.reduce((sum, item) => sum + item.value, 0);
     
     const pieSeries: PieSeriesOption = {
       name: selectedItem.label,

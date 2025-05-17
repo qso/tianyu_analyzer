@@ -133,35 +133,43 @@ const generateTrendSummary = (trendAnalysisData: any): string => {
  */
 export const analyzeData = (data: CSVData[], onProgress: (progress: number) => void): Promise<AnalysisReport> => {
   return new Promise((resolve) => {
-    // 设置进度更新间隔
-    let progress = 0;
-    const progressInterval = setInterval(() => {
-      progress += 5;
-      if (progress <= 95) {
-        onProgress(progress);
-      }
-    }, 100);
+    // 确保至少1秒的加载时间
+    const startTime = Date.now();
+    const minDuration = 1000; // 最少1秒
     
-    // 执行实际的数据分析
-    setTimeout(() => {
-      clearInterval(progressInterval);
-      
+    // 执行任务链
+    let currentProgress = 5; // 初始进度
+    onProgress(currentProgress);
+    
+    const executeAnalysis = async () => {
       try {
-        // 分析天玉消耗趋势
+        // 步骤1: 分析天玉消耗趋势 (25%)
+        onProgress(currentProgress);
         const trendAnalysisData = analyzeTianYuConsumptionTrend(data);
+        currentProgress = 25;
+        onProgress(currentProgress);
         
-        // 生成趋势图表
+        // 步骤2: 生成总体趋势图表 (40%)
         const totalTrendChart = generateConsumptionTrendChart('总体天玉消耗趋势', trendAnalysisData.total);
+        currentProgress = 40;
+        onProgress(currentProgress);
+        
+        // 步骤3: 生成付费等级图表 (60%)
         const paymentLevelCharts = generatePaymentLevelCharts(trendAnalysisData.paymentLevels);
+        currentProgress = 60;
+        onProgress(currentProgress);
+        
+        // 步骤4: 生成购买人数趋势图表 (75%)
         const buyersTrendChart = generateBuyersTrendChart('购买人数趋势', trendAnalysisData.buyersTrend);
+        currentProgress = 75;
+        onProgress(currentProgress);
         
-        // 生成分析总结
+        // 步骤5: 生成分析总结 (90%)
         const trendSummary = generateTrendSummary(trendAnalysisData);
+        currentProgress = 90;
+        onProgress(currentProgress);
         
-        // 设置100%进度
-        onProgress(100);
-        
-        // 返回分析结果
+        // 步骤6: 构建最终报告 (95%)
         const report: AnalysisReport = {
           title: "天玉消耗数据分析报告",
           trends: [
@@ -223,7 +231,6 @@ export const analyzeData = (data: CSVData[], onProgress: (progress: number) => v
               }
             }
           ],
-          // 这里暂时使用模拟数据，后续可以扩展
           users: [
             { id: "user1", title: "用户分析 1", data: { /* 分析数据 */ } }
           ],
@@ -239,7 +246,19 @@ export const analyzeData = (data: CSVData[], onProgress: (progress: number) => v
             content: trendSummary
           }
         };
+        currentProgress = 95;
+        onProgress(currentProgress);
         
+        // 确保至少持续minDuration的时间
+        const endTime = Date.now();
+        const elapsed = endTime - startTime;
+        
+        if (elapsed < minDuration) {
+          await new Promise(r => setTimeout(r, minDuration - elapsed));
+        }
+        
+        // 最终进度
+        onProgress(100);
         resolve(report);
       } catch (error) {
         console.error('数据分析过程中发生错误:', error);
@@ -258,7 +277,10 @@ export const analyzeData = (data: CSVData[], onProgress: (progress: number) => v
           }
         });
       }
-    }, 2000); // 模拟2秒钟的处理时间
+    };
+    
+    // 启动分析过程
+    executeAnalysis();
   });
 };
 

@@ -38,26 +38,55 @@ const SideNav: React.FC<SideNavProps> = ({ items, activeId, onItemClick }) => {
     transform: navHeight ? 'none' : 'translateY(-50%)'
   };
   
+  // 优化侧边栏整体动画
+  const navVariants = {
+    hidden: { x: -100, opacity: 0 },
+    visible: { 
+      x: 0, 
+      opacity: 1,
+      transition: { 
+        duration: 0.4, 
+        ease: "easeOut",
+        // 子元素级联动画
+        staggerChildren: 0.05
+      }
+    }
+  };
+  
+  // 优化导航按钮动画
+  const itemVariants = {
+    hidden: { opacity: 0, x: -20 },
+    visible: { 
+      opacity: 1, 
+      x: 0,
+      transition: { 
+        duration: 0.2, 
+        ease: "easeOut" 
+      }
+    }
+  };
+  
   return (
     <motion.nav
       ref={navRef}
       className="fixed left-4 sm:left-6 md:left-8 w-16 sm:w-20 py-4 px-2 sm:px-3 
                 bg-dark/80 backdrop-blur-lg rounded-xl border border-primary/30 shadow-xl z-10 
                 overflow-y-auto"
-      style={centeredStyle}
-      initial={{ x: -100, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      transition={{ duration: 0.5, delay: 0.2 }}
+      style={{
+        ...centeredStyle,
+        willChange: "transform, opacity" // 促进硬件加速
+      }}
+      variants={navVariants}
+      initial="hidden"
+      animate="visible"
     >
       <div className="flex flex-col items-center justify-center space-y-5">
-        {items.map((item, index) => (
+        {items.map((item) => (
           <motion.button
             key={item.id}
             className={`nav-item group ${activeId === item.id ? 'active' : ''}`}
             onClick={() => onItemClick(item.id)}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.3, delay: 0.1 * index }}
+            variants={itemVariants}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >

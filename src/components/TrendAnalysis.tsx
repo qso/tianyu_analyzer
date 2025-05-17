@@ -31,9 +31,7 @@ const TrendAnalysis: React.FC<TrendAnalysisProps> = ({ trends, isActive, isManua
   
   return (
     <ReportSection id="trends" title="总体趋势分析" isActive={isActive} isManualChange={isManualChange}>
-      <div className="text-light text-lg leading-relaxed mb-6">
-        本版块展示了天玉消耗的变化趋势，帮助您了解不同付费区间用户的消费情况。
-      </div>
+      
       
       {/* 总体天玉消耗趋势 */}
       {trends && trends.length >= 1 && (

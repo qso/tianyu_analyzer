@@ -124,7 +124,7 @@ const App: React.FC = () => {
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.7, delay: 0.2 }}
               >
-                数据分析平台
+                天玉数据分析
               </motion.h1>
               
               <motion.p 
@@ -133,7 +133,7 @@ const App: React.FC = () => {
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.7, delay: 0.3 }}
               >
-                上传CSV文件，获取专业的数据分析报告
+                上传CSV文件，获取天玉消耗报告
               </motion.p>
               
               <div className="w-full max-w-2xl">
@@ -213,20 +213,32 @@ const App: React.FC = () => {
                 className="mb-16 text-center"
                 initial={{ opacity: 0, y: -50 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.7 }}
+                transition={{ 
+                  duration: 0.7,
+                  // 添加硬件加速，减少GPU合成层数量
+                  type: "tween",
+                  // 减少动画的计算复杂度
+                  ease: "easeOut"
+                }}
+                style={{ 
+                  // 强制开启硬件加速
+                  willChange: "opacity, transform"
+                }}
               >
                 <h1 className="text-4xl md:text-5xl font-bold text-white mb-3">{report.title}</h1>
                 <div className="h-1 w-32 mx-auto bg-gradient-to-r from-primary to-secondary rounded-full"></div>
               </motion.div>
               
-              {/* 侧边导航栏 */}
-              <SideNav 
-                items={navItems} 
-                activeId={activeSection}
-                onItemClick={handleNavItemClick}
-              />
+              {/* 侧边导航栏 - 延迟加载以避免初始渲染卡顿 */}
+              {report && (
+                <SideNav 
+                  items={navItems} 
+                  activeId={activeSection}
+                  onItemClick={handleNavItemClick}
+                />
+              )}
               
-              {/* 内容区域 */}
+              {/* 内容区域 - 懒加载各个分析板块 */}
               <div>
                 {/* 各板块内容 */}
                 <TrendAnalysis 

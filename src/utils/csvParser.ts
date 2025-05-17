@@ -1,5 +1,8 @@
 import type { CSVData, AnalysisReport } from "../types";
-import { analyzeTianYuConsumptionTrend } from "./dataAnalysis";
+import { analyzeTianYuConsumptionTrend, analyzeConsumptionChannels, analyzeProductConsumption, analyzeProductRanking } from "./dataAnalysis";
+import type { ChannelAnalysisResult } from "./dataAnalysis";
+import type { ProductConsumptionAnalysis } from "./dataAnalysis";
+import type { ProductRankingData } from "./dataAnalysis";
 import { generateConsumptionTrendChart, generatePaymentLevelCharts, generateBuyersTrendChart } from "./trendChartGenerator";
 
 /**
@@ -257,4 +260,175 @@ export const analyzeData = (data: CSVData[], onProgress: (progress: number) => v
       }
     }, 2000); // 模拟2秒钟的处理时间
   });
+};
+
+/**
+ * 分析物品在不同用户群体中的消费情况
+ * @param data CSV数据
+ * @returns 物品消费分析结果
+ */
+const analyzeItemConsumptionByUserGroup = (data: CSVData[]): {
+  itemNames: string[];
+  itemConsumptionByGroup: Record<string, Array<{
+    userGroup: string;
+    value: number;
+    percentage: number;
+  }>>;
+} => {
+  // 用户群体
+  const userGroups = ['土豪', '大R', '中R', '小R', '平民'];
+  
+  // 获取所有物品名称
+  const allItemNames = data
+    .map(item => item['物品名称'] as string)
+    .filter(name => name !== undefined && name !== null);
+  
+  // 去重并排序
+  const uniqueItemNames = Array.from(new Set(allItemNames)).sort();
+  
+  // 初始化物品消费数据
+  const itemConsumptionByGroup: Record<string, Array<{
+    userGroup: string;
+    value: number;
+    percentage: number;
+  }>> = {};
+  
+  // 分析每个物品在各用户群体中的消费情况
+  uniqueItemNames.forEach(itemName => {
+    // 按用户群体分组数据
+    const itemConsumptionData: {
+      userGroup: string;
+      value: number;
+      percentage: number;
+    }[] = [];
+    
+    // 计算该物品的总消费
+    const totalItemConsumption = data.reduce((sum, item) => {
+      if (String(item['物品名称']) === String(itemName) && typeof item['天玉消耗额'] === 'number') {
+        return sum + (item['天玉消耗额'] as number);
+      }
+      return sum;
+    }, 0);
+    
+    // 计算各用户群体对该物品的消费
+    userGroups.forEach(group => {
+      const groupItemConsumption = data.reduce((sum, item) => {
+        if (
+          String(item['物品名称']) === String(itemName) && 
+          item['付费区间'] === group && 
+          typeof item['天玉消耗额'] === 'number'
+        ) {
+          return sum + (item['天玉消耗额'] as number);
+        }
+        return sum;
+      }, 0);
+      
+      // 计算百分比
+      const percentage = totalItemConsumption > 0 
+        ? (groupItemConsumption / totalItemConsumption) 
+        : 0;
+      
+      // 只添加有消费的群体
+      if (groupItemConsumption > 0) {
+        itemConsumptionData.push({
+          userGroup: group,
+          value: groupItemConsumption,
+          percentage
+        });
+      }
+    });
+    
+    // 按消费额从大到小排序
+    itemConsumptionData.sort((a, b) => b.value - a.value);
+    
+    // 存入结果
+    itemConsumptionByGroup[itemName] = itemConsumptionData;
+  });
+  
+  return {
+    itemNames: uniqueItemNames,
+    itemConsumptionByGroup
+  };
+};
+
+// 缓存对象，用于存储已经处理过的CSV分析结果
+const csvAnalysisCache: Record<string, {
+  data: ChannelAnalysisResult & {
+    productAnalysis?: ProductConsumptionAnalysis;
+    productRanking?: ProductRankingData
+  },
+  timestamp: number
+}> = {};
+
+// 缓存有效期（30分钟）
+const CACHE_TTL = 30 * 60 * 1000;
+
+/**
+ * 加载示例CSV数据并分析
+ * @param csvUrl CSV文件URL
+ * @returns 分析结果
+ */
+export const loadSampleCSVAndAnalyzeChannels = async (csvUrl: string): Promise<ChannelAnalysisResult & {
+  productAnalysis?: ProductConsumptionAnalysis;
+  productRanking?: ProductRankingData;
+  csvData?: CSVData[];
+}> => {
+  // 检查缓存
+  const now = Date.now();
+  const cachedResult = csvAnalysisCache[csvUrl];
+  
+  // 如果缓存存在且未过期，直接返回缓存结果
+  if (cachedResult && (now - cachedResult.timestamp < CACHE_TTL)) {
+    console.log('使用缓存的CSV分析结果');
+    return cachedResult.data;
+  }
+  
+  try {
+    console.log('开始加载和分析CSV数据');
+    // 加载CSV文件
+    const response = await fetch(csvUrl);
+    const csvContent = await response.text();
+    
+    // 解析CSV数据
+    const csvData = parseCSV(csvContent);
+    
+    // 分析消耗渠道
+    const channelAnalysis = analyzeConsumptionChannels(csvData);
+    
+    // 分析物品消费情况
+    const itemAnalysis = analyzeItemConsumptionByUserGroup(csvData);
+    
+    // 分析商品消费类型
+    const productAnalysis = analyzeProductConsumption(csvData);
+    
+    // 分析商品消费排名
+    const productRanking = analyzeProductRanking(csvData, 20); // 获取TOP 20
+    
+    // 合并结果
+    const result = {
+      ...channelAnalysis,
+      ...itemAnalysis,
+      productAnalysis,
+      productRanking,
+      csvData // 添加解析后的CSV数据
+    };
+    
+    // 更新缓存
+    csvAnalysisCache[csvUrl] = {
+      data: result,
+      timestamp: now
+    };
+    
+    return result;
+  } catch (error) {
+    console.error('加载CSV数据失败:', error);
+    return {
+      consumptionData: [],
+      purchaseData: [],
+      mainChannels: [],
+      itemNames: [],
+      itemConsumptionByGroup: {},
+      csvData: []
+    };
+  }
 }; 

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import ReactDOM from 'react-dom';
 import ChartComponent from './ChartComponent';
@@ -23,20 +23,6 @@ const ItemDetailPopup: React.FC<ItemDetailPopupProps> = ({ data, onClose }) => {
   const handleContentClick = (e: React.MouseEvent) => {
     e.stopPropagation();
   };
-
-  // 监听ESC键关闭弹窗
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [onClose]);
 
   // 生成物品占比饼图配置
   const generateItemsPieOption = (): EChartsOption => {
@@ -73,7 +59,31 @@ const ItemDetailPopup: React.FC<ItemDetailPopupProps> = ({ data, onClose }) => {
         }
       },
       legend: {
+        show: false,
+        
+      },
+      grid: {
         show: false
+      },
+      xAxis: {
+        show: false,
+        type: 'category',
+        axisLine: {
+          show: false
+        },
+        splitLine: {
+          show: false
+        }
+      },
+      yAxis: {
+        show: false,
+        type: 'value',
+        axisLine: {
+          show: false
+        },
+        splitLine: {
+          show: false
+        }
       },
       series: [
         {

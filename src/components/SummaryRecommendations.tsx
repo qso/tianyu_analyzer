@@ -54,9 +54,7 @@ const SummaryRecommendations: React.FC<SummaryRecommendationsProps> = ({ summary
 
   return (
     <ReportSection id="summary" title="总结及建议" isActive={isActive} isManualChange={isManualChange}>
-      <div className="text-light text-lg mb-6">
-        基于上述分析，我们提炼出关键洞察和改进建议，助您做出更明智的决策。
-      </div>
+     
       
       {/* 总体评价 */}
       <div className="bg-gradient-to-r from-primary/10 to-secondary/10 p-6 rounded-xl border border-primary/20 mb-8">

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 
 interface ReportSectionProps {
@@ -9,7 +9,7 @@ interface ReportSectionProps {
   isManualChange?: boolean; // 添加是否为主动切换的标志
 }
 
-const ReportSection: React.FC<ReportSectionProps> = ({ id, title, children, isActive, isManualChange = false }) => {
+const ReportSection: React.FC<ReportSectionProps> = React.memo(({ id, title, children, isActive, isManualChange = false }) => {
   const sectionRef = useRef<HTMLDivElement>(null);
   const lastIntersectionTime = useRef<number>(0);
 
@@ -20,6 +20,31 @@ const ReportSection: React.FC<ReportSectionProps> = ({ id, title, children, isAc
       sectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }, [isActive, isManualChange]);
+
+  // 检查页面初始位置，处理顶部项目
+  useEffect(() => {
+    // 只需在组件挂载时执行一次
+    if (sectionRef.current && id === 'trends') {
+      // 延迟执行以确保页面已完全加载
+      setTimeout(() => {
+        const section = sectionRef.current;
+        if (!section) return;
+        
+        // 如果滚动位置在顶部且趋势分析section在视口内
+        if (window.scrollY < 100) {
+          const rect = section.getBoundingClientRect();
+          if (rect.top >= 0 && rect.bottom <= window.innerHeight && !isActive) {
+            // 发送可见事件
+            const event = new CustomEvent('section-visible', { 
+              detail: { id },
+              bubbles: true 
+            });
+            section.dispatchEvent(event);
+          }
+        }
+      }, 300);
+    }
+  }, [id, isActive]);
 
   // 监听滚动，实现双向锚定
   useEffect(() => {
@@ -45,7 +70,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ id, title, children, isAc
         }
       },
       { 
-        rootMargin: '-10% 0px -70% 0px', // 当元素进入视口顶部10%到底部30%区域时触发
+        rootMargin: '-5% 0px -70% 0px', // 调整顶部边距，更容易触发顶部区域
         threshold: 0.1 
       }
     );
@@ -73,6 +98,14 @@ const ReportSection: React.FC<ReportSectionProps> = ({ id, title, children, isAc
       {children}
     </motion.section>
   );
-};
+}, (prevProps, nextProps) => {
+  // 只有当id、isActive或isManualChange发生变化时才重新渲染
+  return (
+    prevProps.id === nextProps.id &&
+    prevProps.isActive === nextProps.isActive &&
+    prevProps.isManualChange === nextProps.isManualChange &&
+    prevProps.title === nextProps.title
+  );
+});
 
 export default ReportSection; 

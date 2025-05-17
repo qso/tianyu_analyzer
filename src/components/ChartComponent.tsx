@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import ReactECharts from 'echarts-for-react';
 import type { EChartsOption } from 'echarts';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -12,7 +12,7 @@ interface ChartComponentProps {
   onChartClick?: (params: any) => void;
 }
 
-const ChartComponent: React.FC<ChartComponentProps> = ({ 
+const ChartComponent: React.FC<ChartComponentProps> = React.memo(({ 
   option, 
   title,
   height = '400px',
@@ -23,7 +23,7 @@ const ChartComponent: React.FC<ChartComponentProps> = ({
   const [selectedPoint, setSelectedPoint] = useState<any>(null);
 
   // 为ECharts设置默认的主题颜色
-  const themeOption: EChartsOption = {
+  const themeOption = useMemo<EChartsOption>(() => ({
     backgroundColor: 'transparent',
     textStyle: {
       color: '#f1f5f9'
@@ -74,13 +74,13 @@ const ChartComponent: React.FC<ChartComponentProps> = ({
       bottom: '3%',
       containLabel: true
     }
-  };
+  }), []);
 
   // 合并传入的配置与主题配置
-  const mergedOption = { ...themeOption, ...option };
+  const mergedOption = useMemo(() => ({ ...themeOption, ...option }), [themeOption, option]);
 
   // 处理图表点击事件
-  const handleChartClick = (params: any) => {
+  const handleChartClick = useCallback((params: any) => {
     if (pointData && pointData[params.dataIndex]) {
       setSelectedPoint(pointData[params.dataIndex]);
       setIsPopupVisible(true);
@@ -90,12 +90,17 @@ const ChartComponent: React.FC<ChartComponentProps> = ({
     if (onChartClick) {
       onChartClick(params);
     }
-  };
+  }, [pointData, onChartClick]);
 
   // 关闭弹窗
-  const handleClosePopup = () => {
+  const handleClosePopup = useCallback(() => {
     setIsPopupVisible(false);
-  };
+  }, []);
+
+  // 图表事件配置
+  const chartEvents = useMemo(() => ({
+    click: handleChartClick
+  }), [handleChartClick]);
 
   return (
     <motion.div
@@ -113,9 +118,9 @@ const ChartComponent: React.FC<ChartComponentProps> = ({
           option={mergedOption}
           style={{ height, width: '100%' }}
           className="echarts-for-react"
-          onEvents={{
-            click: handleChartClick
-          }}
+          onEvents={chartEvents}
+          notMerge={true}
+          lazyUpdate={true}
         />
       </div>
 
@@ -130,6 +135,6 @@ const ChartComponent: React.FC<ChartComponentProps> = ({
       </AnimatePresence>
     </motion.div>
   );
-};
+});
 
 export default ChartComponent; 

@@ -10,5 +10,5 @@ export default defineConfig({
       '@': path.resolve(__dirname, 'src'),
     },
   },
-  assetsInclude: ['**/*.mp4'],
+  assetsInclude: ['**/*.mp4', '**/*.csv'],
 })

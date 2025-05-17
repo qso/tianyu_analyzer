@@ -1,4 +1,5 @@
 import type { CSVData } from '../types';
+import { loadSampleCSVAndAnalyzeChannels } from './csvParser';
 
 // 日期解析函数，支持多种格式：'17/4/2025'，'2025/4/17'，'2025-04-17'
 export const parseDate = (dateStr: string): Date => {
@@ -355,6 +356,32 @@ export interface BuyersTrendData {
   };
 }
 
+// 消耗渠道数据结构
+export interface ChannelConsumptionData {
+  userGroup: string;
+  channelData: {
+    [channel: string]: number;
+  };
+  totalConsumption: number;
+  avgConsumption: number;
+  userCount: number;
+  mainChannels: string[];
+}
+
+// 消耗渠道分析结果
+export interface ChannelAnalysisResult {
+  consumptionData: ChannelConsumptionData[];
+  purchaseData: ChannelConsumptionData[];
+  mainChannels: string[];
+  // 物品分析相关字段
+  itemNames?: string[];
+  itemConsumptionByGroup?: Record<string, Array<{
+    userGroup: string;
+    value: number;
+    percentage: number;
+  }>>;
+}
+
 // 分析天玉消耗趋势
 export const analyzeTianYuConsumptionTrend = (data: CSVData[]): {
   total: TrendData;
@@ -460,5 +487,313 @@ export const analyzeTianYuConsumptionTrend = (data: CSVData[]): {
     },
     paymentLevels: paymentLevelTrends,
     buyersTrend
+  };
+};
+
+// 分析消耗渠道数据
+export const analyzeConsumptionChannels = (data: CSVData[]): ChannelAnalysisResult => {
+  // 按付费区间分组数据
+  const userGroups = ['土豪', '大R', '中R', '小R', '平民'];
+  
+  // 首先统计全部渠道的总消耗金额
+  const allChannelsConsumption: Record<string, number> = {};
+  
+  data.forEach(item => {
+    const channel = typeof item['消耗渠道'] === 'string' ? (item['消耗渠道'] as string) : '其他';
+    const consumption = typeof item['天玉消耗额'] === 'number' ? item['天玉消耗额'] as number : 0;
+    
+    if (!allChannelsConsumption[channel]) {
+      allChannelsConsumption[channel] = 0;
+    }
+    allChannelsConsumption[channel] += consumption;
+  });
+  
+  // 将渠道按消耗金额排序，取前5名
+  const sortedChannels = Object.entries(allChannelsConsumption)
+    .sort((a, b) => b[1] - a[1]) // 按消耗金额降序排序
+    .slice(0, 4) // 取前4名
+    .map(([channel]) => channel); // 只保留渠道名称
+  
+  // 输出查看前5大渠道
+  console.log('前5大消耗渠道:', sortedChannels);
+  
+  // 统计各用户群体的消耗渠道数据
+  const consumptionData: ChannelConsumptionData[] = [];
+  const purchaseData: ChannelConsumptionData[] = [];
+  
+  userGroups.forEach((group) => {
+    // 筛选当前用户群体的数据
+    const groupData = data.filter(item => item['付费区间'] === group);
+    
+    // 初始化渠道数据
+    const channelConsumption: { [channel: string]: number } = {};
+    const channelPurchase: { [channel: string]: number } = {};
+    
+    // 遍历所有数据行
+    groupData.forEach(item => {
+      const channel = typeof item['消耗渠道'] === 'string' 
+        ? (sortedChannels.includes(item['消耗渠道'] as string) ? item['消耗渠道'] as string : '其他')
+        : '其他';
+      
+      const consumption = typeof item['天玉消耗额'] === 'number' ? item['天玉消耗额'] as number : 0;
+      const roleCount = typeof item['角色数'] === 'number' ? item['角色数'] as number : 0;
+      
+      // 累加消耗金额
+      if (!channelConsumption[channel]) {
+        channelConsumption[channel] = 0;
+      }
+      channelConsumption[channel] += consumption;
+      
+      // 累加购买人数
+      if (!channelPurchase[channel]) {
+        channelPurchase[channel] = 0;
+      }
+      channelPurchase[channel] += roleCount;
+    });
+    
+    // 计算总消费和用户总数
+    const totalConsumption = Object.values(channelConsumption).reduce((sum, val) => sum + val, 0);
+    const userCount = groupData.reduce((sum, item) => sum + (typeof item['角色数'] === 'number' ? item['角色数'] as number : 0), 0);
+    
+    // 计算人均消费
+    const avgConsumption = userCount > 0 ? Math.round(totalConsumption / userCount) : 0;
+    
+    // 添加到结果中
+    consumptionData.push({
+      userGroup: group,
+      channelData: channelConsumption,
+      totalConsumption,
+      avgConsumption,
+      userCount,
+      // 添加主要渠道列表，以便于UI层使用
+      mainChannels: [...sortedChannels, '其他']
+    });
+    
+    purchaseData.push({
+      userGroup: group,
+      channelData: channelPurchase,
+      totalConsumption,
+      avgConsumption,
+      userCount,
+      // 添加主要渠道列表，以便于UI层使用
+      mainChannels: [...sortedChannels, '其他']
+    });
+  });
+  
+  // 按照指定顺序排序结果
+  const sortOrder = {
+    '土豪': 0,
+    '大R': 1,
+    '中R': 2,
+    '小R': 3,
+    '平民': 4
+  };
+  
+  consumptionData.sort((a, b) => sortOrder[a.userGroup as keyof typeof sortOrder] - sortOrder[b.userGroup as keyof typeof sortOrder]);
+  purchaseData.sort((a, b) => sortOrder[a.userGroup as keyof typeof sortOrder] - sortOrder[b.userGroup as keyof typeof sortOrder]);
+  
+  return { 
+    consumptionData, 
+    purchaseData, 
+    // 传递主要渠道列表到结果中
+    mainChannels: [...sortedChannels, '其他']
+  };
+};
+
+// 商品消费类型分析数据接口
+export interface ProductConsumptionAnalysis {
+  dates: string[];
+  // 按日期和消费类型的数据
+  dailyData: {
+    date: string;
+    appearance: number; // 外观付费
+    value: number;      // 数值付费
+    total: number;      // 总消费
+  }[];
+  // 总计
+  total: {
+    appearance: number;
+    value: number;
+    total: number;
+  };
+  // 占比
+  proportion: {
+    appearance: number;
+    value: number;
+  };
+}
+
+// 产品消费排名分析数据接口
+export interface ProductRankingData {
+  products: Array<{
+    name: string;
+    value: number;
+  }>;
+  totalConsumption: number;
+}
+
+/**
+ * 分析商品消费数据，将消费分为外观付费和数值付费
+ * @param data CSV数据
+ * @returns 商品消费分析结果
+ */
+export const analyzeProductConsumption = (data: CSVData[]): ProductConsumptionAnalysis => {
+  // 避免数据为空的情况
+  if (!data || data.length === 0) {
+    return {
+      dates: [],
+      dailyData: [],
+      total: { appearance: 0, value: 0, total: 0 },
+      proportion: { appearance: 0, value: 0 }
+    };
+  }
+
+  // 按日期分组数据 - 提前进行过滤，只包含有消费额的数据
+  const validData = data.filter(item => {
+    const consumption = typeof item['天玉消耗额'] === 'number' ? item['天玉消耗额'] as number : 0;
+    return consumption > 0;
+  });
+  const groupedByDate = groupDataByDate(validData);
+  const sortedDates = Array.from(groupedByDate.keys()).sort();
+  
+  // 初始化每日数据结构
+  const dailyData: {
+    date: string;
+    appearance: number;
+    value: number;
+    total: number;
+  }[] = [];
+  
+  // 初始化总计
+  let totalAppearance = 0;
+  let totalValue = 0;
+  
+  // 遍历每一天
+  sortedDates.forEach(date => {
+    const dayItems = groupedByDate.get(date) || [];
+    
+    // 初始化当天消费额
+    let dayAppearance = 0;
+    let dayValue = 0;
+    
+    // 计算当天每种类型的消费额
+    dayItems.forEach(item => {
+      // 获取消费额
+      const consumption = typeof item['天玉消耗额'] === 'number' ? item['天玉消耗额'] as number : 0;
+      
+      // 获取消费渠道和物品名称
+      const channel = item['消耗渠道'] as string;
+      const itemName = item['物品名称'];
+      
+      // 分类判断
+      // 1. 当消耗渠道=『解锁外观』或『月度时装抽奖』，或者消耗渠道=『货币被动兑换』且物品名称=『织梦券』的时候，归类为外观付费
+      // 2. 其他情况归为数值付费
+      const isAppearancePay = 
+        channel === '解锁外观' || 
+        channel === '月度时装抽奖' || 
+        (channel === '货币被动兑换' && String(itemName) === '织梦券');
+      
+      if (isAppearancePay) {
+        dayAppearance += consumption;
+      } else {
+        dayValue += consumption;
+      }
+    });
+    
+    // 累加总计
+    totalAppearance += dayAppearance;
+    totalValue += dayValue;
+    
+    // 添加到每日数据结构 - 只在有消费的情况下添加
+    const dayTotal = dayAppearance + dayValue;
+    if (dayTotal > 0) {
+      dailyData.push({
+        date,
+        appearance: dayAppearance,
+        value: dayValue,
+        total: dayTotal
+      });
+    }
+  });
+  
+  // 计算总计
+  const totalConsumption = totalAppearance + totalValue;
+  
+  // 计算占比
+  const proportionAppearance = totalConsumption > 0 ? totalAppearance / totalConsumption : 0;
+  const proportionValue = totalConsumption > 0 ? totalValue / totalConsumption : 0;
+  
+  return {
+    dates: sortedDates,
+    dailyData,
+    total: {
+      appearance: totalAppearance,
+      value: totalValue,
+      total: totalConsumption
+    },
+    proportion: {
+      appearance: proportionAppearance,
+      value: proportionValue
+    }
+  };
+};
+
+/**
+ * 加载并分析商品数据
+ * @returns Promise，包含商品消费分析和商品消费排名数据
+ */
+export const loadAndAnalyzeProductData = async (csvUrl: string): Promise<{
+  productAnalysis?: ProductConsumptionAnalysis;
+  productRanking?: ProductRankingData;
+}> => {
+  try {
+    // 使用现有的加载函数获取数据
+    const result = await loadSampleCSVAndAnalyzeChannels(csvUrl);
+    
+    return {
+      productAnalysis: result.productAnalysis,
+      productRanking: result.productRanking
+    };
+  } catch (error) {
+    console.error('加载和分析商品数据失败:', error);
+    return {};
+  }
+};
+
+/**
+ * 分析商品消费排名数据
+ * @param data CSV数据
+ * @param topN 需要返回的前N个商品，默认为20
+ * @returns 商品消费排名分析结果
+ */
+export const analyzeProductRanking = (data: CSVData[], topN: number = 20): ProductRankingData => {
+  // 按物品名称分组并计算消耗总额
+  const productConsumption = new Map<string, number>();
+  
+  data.forEach(item => {
+    const productName = item['物品名称'];
+    const consumption = typeof item['天玉消耗额'] === 'number' ? item['天玉消耗额'] as number : 0;
+    
+    if (productName && consumption > 0) {
+      if (productConsumption.has(String(productName))) {
+        productConsumption.set(String(productName), productConsumption.get(String(productName))! + consumption);
+      } else {
+        productConsumption.set(String(productName), consumption);
+      }
+    }
+  });
+  
+  // 转换为数组并排序
+  const products = Array.from(productConsumption.entries())
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, topN);
+  
+  // 计算总消费额
+  const totalConsumption = products.reduce((sum, product) => sum + product.value, 0);
+  
+  return {
+    products,
+    totalConsumption
   };
 }; 

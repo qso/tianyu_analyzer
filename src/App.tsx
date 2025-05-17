@@ -27,6 +27,10 @@ const App: React.FC = () => {
   const [activeSection, setActiveSection] = useState<string>('trends');
   // 添加一个标志，用于区分主动点击和被动滚动
   const isManualChangeRef = useRef<boolean>(false);
+  // 添加滚动锁定标志，防止滚动期间被动更新导航选中状态
+  const scrollLockRef = useRef<boolean>(false);
+  // 存储定时器ID，用于清除
+  const scrollLockTimerRef = useRef<number | null>(null);
   
   // 根据状态显示不同的界面
   const isUploadScreen = status === AnalysisStatus.IDLE || status === AnalysisStatus.ERROR;
@@ -48,6 +52,9 @@ const App: React.FC = () => {
   // 处理section-visible事件，实现双向锚定
   const handleSectionVisible = useCallback((event: Event) => {
     const customEvent = event as CustomEvent;
+    // 如果滚动锁定标志为true，则忽略滚动事件
+    if (scrollLockRef.current) return;
+    
     if (customEvent.detail && customEvent.detail.id) {
       // 被动改变导航项
       isManualChangeRef.current = false;
@@ -60,6 +67,20 @@ const App: React.FC = () => {
     // 主动点击导航项
     isManualChangeRef.current = true;
     setActiveSection(id);
+    
+    // 设置滚动锁定标志，阻止滚动过程中的被动选中
+    scrollLockRef.current = true;
+    
+    // 清除之前的定时器（如果存在）
+    if (scrollLockTimerRef.current !== null) {
+      window.clearTimeout(scrollLockTimerRef.current);
+    }
+    
+    // 设置定时器，1秒后解锁（滚动动画大约需要这么长时间）
+    scrollLockTimerRef.current = window.setTimeout(() => {
+      scrollLockRef.current = false;
+      scrollLockTimerRef.current = null;
+    }, 1000);
   }, []);
   
   // 添加和移除事件监听器
@@ -70,6 +91,10 @@ const App: React.FC = () => {
     
     return () => {
       document.removeEventListener('section-visible', handleSectionVisible);
+      // 清除定时器
+      if (scrollLockTimerRef.current !== null) {
+        window.clearTimeout(scrollLockTimerRef.current);
+      }
     };
   }, [isReportScreen, handleSectionVisible]);
   

@@ -11,6 +11,7 @@ interface ReportSectionProps {
 
 const ReportSection: React.FC<ReportSectionProps> = ({ id, title, children, isActive, isManualChange = false }) => {
   const sectionRef = useRef<HTMLDivElement>(null);
+  const lastIntersectionTime = useRef<number>(0);
 
   // 当导航项被点击时，滚动到对应的部分
   // 仅在主动切换时触发滚动
@@ -29,12 +30,18 @@ const ReportSection: React.FC<ReportSectionProps> = ({ id, title, children, isAc
       ([entry]) => {
         // 当组件进入视口且不是因为点击导航项激活的
         if (entry.isIntersecting && !isActive) {
-          // 通过向上查找与导航系统交流
-          const event = new CustomEvent('section-visible', { 
-            detail: { id },
-            bubbles: true 
-          });
-          section.dispatchEvent(event);
+          // 为了减少高频率滚动时的重复触发，增加时间间隔控制
+          const now = Date.now();
+          if (now - lastIntersectionTime.current > 100) { // 100ms节流
+            lastIntersectionTime.current = now;
+            
+            // 通过向上查找与导航系统交流
+            const event = new CustomEvent('section-visible', { 
+              detail: { id },
+              bubbles: true 
+            });
+            section.dispatchEvent(event);
+          }
         }
       },
       { 

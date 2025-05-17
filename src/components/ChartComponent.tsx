@@ -1,19 +1,27 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ReactECharts from 'echarts-for-react';
 import type { EChartsOption } from 'echarts';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import ItemDetailPopup from './ItemDetailPopup';
 
 interface ChartComponentProps {
   option: EChartsOption;
   title?: string;
   height?: string;
+  pointData?: any; // 每个数据点的详细信息
+  onChartClick?: (params: any) => void;
 }
 
 const ChartComponent: React.FC<ChartComponentProps> = ({ 
   option, 
   title,
-  height = '400px'
+  height = '400px',
+  pointData,
+  onChartClick
 }) => {
+  const [isPopupVisible, setIsPopupVisible] = useState(false);
+  const [selectedPoint, setSelectedPoint] = useState<any>(null);
+
   // 为ECharts设置默认的主题颜色
   const themeOption: EChartsOption = {
     backgroundColor: 'transparent',
@@ -71,6 +79,24 @@ const ChartComponent: React.FC<ChartComponentProps> = ({
   // 合并传入的配置与主题配置
   const mergedOption = { ...themeOption, ...option };
 
+  // 处理图表点击事件
+  const handleChartClick = (params: any) => {
+    if (pointData && pointData[params.dataIndex]) {
+      setSelectedPoint(pointData[params.dataIndex]);
+      setIsPopupVisible(true);
+    }
+    
+    // 如果有外部传入的点击处理函数，也调用它
+    if (onChartClick) {
+      onChartClick(params);
+    }
+  };
+
+  // 关闭弹窗
+  const handleClosePopup = () => {
+    setIsPopupVisible(false);
+  };
+
   return (
     <motion.div
       className="mb-6"
@@ -87,8 +113,21 @@ const ChartComponent: React.FC<ChartComponentProps> = ({
           option={mergedOption}
           style={{ height, width: '100%' }}
           className="echarts-for-react"
+          onEvents={{
+            click: handleChartClick
+          }}
         />
       </div>
+
+      {/* 数据点弹窗 */}
+      <AnimatePresence>
+        {isPopupVisible && selectedPoint && (
+          <ItemDetailPopup 
+            data={selectedPoint} 
+            onClose={handleClosePopup}
+          />
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };

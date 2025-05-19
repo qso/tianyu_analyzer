@@ -3,7 +3,7 @@ import ChartComponent from './ChartComponent';
 import ReportSection from './ReportSection';
 import type { ProductAnalysis as ProductAnalysisType } from '../types';
 import type { ProductConsumptionAnalysis, ProductRankingData } from '../utils/dataAnalysis';
-import { formatLargeNumber } from '../utils/dataAnalysis';
+import { formatLargeNumber, parseDate } from '../utils/dataAnalysis';
 import type { EChartsOption, BarSeriesOption } from 'echarts';
 import { dataCache } from '../utils/dataCache';
 
@@ -551,12 +551,153 @@ const ProductAnalysis: React.FC<ProductAnalysisProps> = React.memo(({ isActive, 
   // 生成TOP 20商品柱状图选项
   const top20ProductsBarOption = useMemo(() => generateTop20ProductsBarOption(), [generateTop20ProductsBarOption]);
 
-  
-  
+  // 在generateConsumptionStackBarOption后添加新的图表生成函数
+  const generateARPUTrendChartOption = useCallback((): EChartsOption => {
+    if (!productData) {
+      return {
+        title: {
+          text: '外观付费与数值付费ARPU趋势',
+          left: 'center',
+          textStyle: {
+            color: '#ffffff'
+          }
+        }
+      };
+    }
+
+    const { dates, dailyData } = productData;
+    
+    // 计算每日ARPU
+    const arpuData = dailyData.map(item => {
+      // 避免除以0，如果DAU为0则使用1
+      const dau = item.dau || 1; 
+      return {
+        date: item.date,
+        appearanceARPU: item.appearance / dau,
+        valueARPU: item.value / dau,
+        dau: item.dau
+      };
+    });
+
+    // 准备数据系列
+    const appearanceARPUData = arpuData.map(item => parseFloat(item.appearanceARPU.toFixed(2)));
+    const valueARPUData = arpuData.map(item => parseFloat(item.valueARPU.toFixed(2)));
+
+    return {
+      title: {
+        text: '外观付费与数值付费ARPU趋势',
+        left: 'center',
+        top: 0,
+        textStyle: {
+          color: '#ffffff'
+        }
+      },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: {
+          type: 'line'
+        },
+        formatter: (params: any) => {
+          const date = params[0].axisValue;
+          const idx = params[0].dataIndex;
+          const dayData = arpuData[idx];
+          let result = `${date}<br/>`;
+          
+          params.forEach((param: any) => {
+            // 格式化ARPU值，保留2位小数
+            const value = param.value.toFixed(2);
+            result += `${param.marker} ${param.seriesName}: ${value} 天玉<br/>`;
+          });
+          
+          // 添加当日消费和DAU信息
+          const dailyInfo = dailyData[idx];
+          result += `<div style="margin-top: 5px; border-top: 1px solid rgba(255,255,255,0.3); padding-top: 5px;">`;
+          result += `外观消费: ${formatLargeNumber(dailyInfo.appearance)}<br/>`;
+          result += `数值消费: ${formatLargeNumber(dailyInfo.value)}<br/>`;
+          result += `DAU: ${formatLargeNumber(dayData.dau)}</div>`;
+          
+          return result;
+        },
+        backgroundColor: 'rgba(50, 50, 50, 0.9)',
+        borderColor: 'rgba(255, 255, 255, 0.3)',
+        textStyle: {
+          color: '#ffffff'
+        }
+      },
+      legend: {
+        data: ['外观付费ARPU', '数值付费ARPU'],
+        top: 30,
+        textStyle: {
+          color: '#ffffff'
+        }
+      },
+      grid: {
+        left: '3%',
+        right: '4%',
+        bottom: '3%',
+        top: 80,
+        containLabel: true
+      },
+      xAxis: {
+        type: 'category',
+        data: dates,
+        axisLabel: {
+          color: '#ffffff',
+          rotate: 45,
+          fontSize: 10
+        }
+      },
+      yAxis: {
+        type: 'value',
+        name: 'ARPU(天玉)',
+        axisLabel: {
+          color: '#ffffff',
+          formatter: '{value}'
+        },
+        splitLine: {
+          lineStyle: {
+            color: 'rgba(255, 255, 255, 0.1)'
+          }
+        }
+      },
+      series: [
+        {
+          name: '外观付费ARPU',
+          type: 'line',
+          data: appearanceARPUData,
+          symbol: 'circle',
+          symbolSize: 6,
+          itemStyle: {
+            color: '#91cc75'
+          },
+          lineStyle: {
+            width: 2,
+            type: 'solid'
+          }
+        },
+        {
+          name: '数值付费ARPU',
+          type: 'line',
+          data: valueARPUData,
+          symbol: 'circle',
+          symbolSize: 6,
+          itemStyle: {
+            color: '#5470c6'
+          },
+          lineStyle: {
+            width: 2,
+            type: 'solid'
+          }
+        }
+      ]
+    };
+  }, [productData]);
+
+  // 生成ARPU趋势图表选项
+  const arpuTrendChartOption = useMemo(() => generateARPUTrendChartOption(), [generateARPUTrendChartOption]);
+
   return (
     <ReportSection id="products" title="商品分析" isActive={isActive} isManualChange={isManualChange}>
-      
-      
       {isLoading ? (
         <div className="flex justify-center items-center h-[400px]">
           <div className="text-primary text-lg">正在加载数据...</div>
@@ -581,14 +722,21 @@ const ProductAnalysis: React.FC<ProductAnalysisProps> = React.memo(({ isActive, 
             </div>
           </div>
           
-          {/* TOP 20天玉消耗额商品柱状图，独占一行 */}
+          {/* ARPU趋势图表 */}
+          <div className="my-8">
+            <ChartComponent 
+              option={arpuTrendChartOption}
+              height="400px"
+            />
+          </div>
+          
+          {/* TOP 20天玉消耗额商品柱状图 */}
           <div className="my-8">
             <ChartComponent 
               option={top20ProductsBarOption}
               height="450px"
             />
           </div>
-          
         </>
       )}
       

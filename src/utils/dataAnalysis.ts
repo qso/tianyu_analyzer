@@ -603,20 +603,18 @@ export const analyzeConsumptionChannels = (data: CSVData[]): ChannelAnalysisResu
 // 商品消费类型分析数据接口
 export interface ProductConsumptionAnalysis {
   dates: string[];
-  // 按日期和消费类型的数据
   dailyData: {
     date: string;
-    appearance: number; // 外观付费
-    value: number;      // 数值付费
-    total: number;      // 总消费
+    appearance: number;
+    value: number;
+    total: number;
+    dau: number;  // 添加DAU字段
   }[];
-  // 总计
   total: {
     appearance: number;
     value: number;
     total: number;
   };
-  // 占比
   proportion: {
     appearance: number;
     value: number;
@@ -638,47 +636,36 @@ export interface ProductRankingData {
  * @returns 商品消费分析结果
  */
 export const analyzeProductConsumption = (data: CSVData[]): ProductConsumptionAnalysis => {
-  // 避免数据为空的情况
-  if (!data || data.length === 0) {
-    return {
-      dates: [],
-      dailyData: [],
-      total: { appearance: 0, value: 0, total: 0 },
-      proportion: { appearance: 0, value: 0 }
-    };
-  }
-
-  // 按日期分组数据 - 提前进行过滤，只包含有消费额的数据
-  const validData = data.filter(item => {
-    const consumption = typeof item['天玉消耗额'] === 'number' ? item['天玉消耗额'] as number : 0;
-    return consumption > 0;
-  });
-  const groupedByDate = groupDataByDate(validData);
-  const sortedDates = Array.from(groupedByDate.keys()).sort();
-  
-  // 初始化每日数据结构
+  // 按日期分组的数据
   const dailyData: {
     date: string;
     appearance: number;
     value: number;
     total: number;
+    dau: number;
   }[] = [];
   
-  // 初始化总计
-  let totalAppearance = 0;
-  let totalValue = 0;
+  // 按日期分组
+  const groupedByDate = new Map<string, CSVData[]>();
+  data.forEach(item => {
+    const date = String(item['日期']);
+    if (!groupedByDate.has(date)) {
+      groupedByDate.set(date, []);
+    }
+    groupedByDate.get(date)!.push(item);
+  });
   
-  // 遍历每一天
-  sortedDates.forEach(date => {
-    const dayItems = groupedByDate.get(date) || [];
-    
-    // 初始化当天消费额
+  // 处理每日数据
+  for (const [date, dayItems] of groupedByDate) {
+    // 计算外观和数值消费
     let dayAppearance = 0;
     let dayValue = 0;
     
-    // 计算当天每种类型的消费额
+    // 使用CSV中的DAU列
+    // 获取当天的DAU值（取第一条记录的DAU值，因为同一天DAU值应该相同）
+    const dau = typeof dayItems[0]['DAU'] === 'number' ? dayItems[0]['DAU'] as number : 0;
+    
     dayItems.forEach(item => {
-      // 获取消费额
       const consumption = typeof item['天玉消耗额'] === 'number' ? item['天玉消耗额'] as number : 0;
       
       // 获取消费渠道和物品名称
@@ -700,41 +687,45 @@ export const analyzeProductConsumption = (data: CSVData[]): ProductConsumptionAn
       }
     });
     
-    // 累加总计
-    totalAppearance += dayAppearance;
-    totalValue += dayValue;
-    
-    // 添加到每日数据结构 - 只在有消费的情况下添加
     const dayTotal = dayAppearance + dayValue;
-    if (dayTotal > 0) {
-      dailyData.push({
-        date,
-        appearance: dayAppearance,
-        value: dayValue,
-        total: dayTotal
-      });
-    }
+    
+    dailyData.push({
+      date,
+      appearance: dayAppearance,
+      value: dayValue,
+      total: dayTotal,
+      dau: dau
+    });
+  }
+  
+  // 按日期排序 - 使用parseDate函数兼容不同的日期格式
+  dailyData.sort((a, b) => {
+    const dateA = parseDate(a.date);
+    const dateB = parseDate(b.date);
+    return dateA.getTime() - dateB.getTime();
   });
   
-  // 计算总计
-  const totalConsumption = totalAppearance + totalValue;
+  // 计算总计数据
+  const total = dailyData.reduce(
+    (acc, day) => ({
+      appearance: acc.appearance + day.appearance,
+      value: acc.value + day.value,
+      total: acc.total + day.total
+    }),
+    { appearance: 0, value: 0, total: 0 }
+  );
   
   // 计算占比
-  const proportionAppearance = totalConsumption > 0 ? totalAppearance / totalConsumption : 0;
-  const proportionValue = totalConsumption > 0 ? totalValue / totalConsumption : 0;
+  const proportion = {
+    appearance: total.total > 0 ? total.appearance / total.total : 0,
+    value: total.total > 0 ? total.value / total.total : 0
+  };
   
   return {
-    dates: sortedDates,
+    dates: dailyData.map(item => item.date),
     dailyData,
-    total: {
-      appearance: totalAppearance,
-      value: totalValue,
-      total: totalConsumption
-    },
-    proportion: {
-      appearance: proportionAppearance,
-      value: proportionValue
-    }
+    total,
+    proportion
   };
 };
 

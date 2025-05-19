@@ -34,7 +34,7 @@ const SkillAnalysis: React.FC<SkillAnalysisProps> = ({ isActive, isManualChange 
   const ITEM_NAMES: {[key: string]: string} = {
     '485635': '技能觉醒赛季礼包（绑）',
     '485636': '技能觉醒赛季礼包（天）',
-    '485637': '技能决定绑玉礼包',
+    '485637': '技能觉醒绑玉礼包',
     '485638': '混沌之泉',
     '485644': '星海赛季助力礼包'
   };
@@ -461,9 +461,6 @@ const SkillAnalysis: React.FC<SkillAnalysisProps> = ({ isActive, isManualChange 
 
   return (
     <ReportSection id="skills" title="技能觉醒分析" isActive={isActive} isManualChange={isManualChange}>
-      <div className="text-light text-lg leading-relaxed mb-6">
-        本版块针对技能觉醒系统的数据进行专项分析，帮助了解用户技能进阶情况。
-      </div>
       
       {isLoading ? (
         <div className="flex justify-center items-center h-[400px]">

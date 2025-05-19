@@ -3,9 +3,9 @@ import ChartComponent from './ChartComponent';
 import ReportSection from './ReportSection';
 import type { ProductAnalysis as ProductAnalysisType } from '../types';
 import type { ProductConsumptionAnalysis, ProductRankingData } from '../utils/dataAnalysis';
-import { formatLargeNumber, loadAndAnalyzeProductData } from '../utils/dataAnalysis';
+import { formatLargeNumber } from '../utils/dataAnalysis';
 import type { EChartsOption, BarSeriesOption } from 'echarts';
-import sampleDataCSV from '../assets/sample_data.csv?url';
+import { dataCache } from '../utils/dataCache';
 
 interface ProductAnalysisProps {
   products: ProductAnalysisType[];
@@ -119,17 +119,20 @@ const ProductAnalysis: React.FC<ProductAnalysisProps> = React.memo(({ isActive, 
     const loadData = async () => {
       setIsLoading(true);
       try {
-        // 使用单独的函数加载和分析数据
-        const result = await loadAndAnalyzeProductData(sampleDataCSV);
-        
-        // 设置商品消费类型分析数据
-        if (result.productAnalysis) {
-          setProductData(result.productAnalysis);
-        }
-        
-        // 设置商品消费排名数据
-        if (result.productRanking) {
-          setProductRanking(result.productRanking);
+        // 从缓存获取分析结果
+        const result = dataCache.getAnalysisResult();
+        if (result) {
+          // 设置商品消费类型分析数据
+          if (result.productAnalysis) {
+            setProductData(result.productAnalysis);
+          }
+          
+          // 设置商品消费排名数据
+          if (result.productRanking) {
+            setProductRanking(result.productRanking);
+          }
+        } else {
+          console.error('未找到分析结果');
         }
       } catch (error) {
         console.error('加载商品分析数据失败:', error);

@@ -2,11 +2,10 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import ChartComponent from './ChartComponent';
 import ReportSection from './ReportSection';
 import type { SkillAnalysis as SkillAnalysisType } from '../types';
-import { loadSampleCSVAndAnalyzeChannels } from '../utils/csvParser';
-import sampleDataCSV from '../assets/sample_data.csv?url';
 import { formatLargeNumber } from '../utils/dataAnalysis';
 import type { EChartsOption, BarSeriesOption, LineSeriesOption } from 'echarts';
 import type { CSVData } from '../types';
+import { dataCache } from '../utils/dataCache';
 
 interface SkillAnalysisProps {
   skills: SkillAnalysisType[];
@@ -23,6 +22,59 @@ interface DailySkillConsumption {
   dau: number;
   arpu: number;
 }
+
+// 日期格式化工具函数
+const parseDateString = (dateStr: string): Date => {
+  // 移除所有空格
+  dateStr = dateStr.trim();
+  
+  // 尝试不同的日期格式
+  const formats = [
+    // 年/月/日
+    /^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/,
+    // 日/月/年
+    /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/,
+    // 月/日/年
+    /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/
+  ];
+  
+  for (const format of formats) {
+    const match = dateStr.match(format);
+    if (match) {
+      const [_, part1, part2, part3] = match;
+      
+      // 根据格式创建日期
+      if (format === formats[0]) {
+        // 年/月/日
+        return new Date(+part1, +part2 - 1, +part3);
+      } else if (format === formats[1]) {
+        // 日/月/年
+        return new Date(+part3, +part2 - 1, +part1);
+      } else {
+        // 月/日/年
+        return new Date(+part3, +part1 - 1, +part2);
+      }
+    }
+  }
+  
+  // 如果都不匹配，尝试直接解析
+  const date = new Date(dateStr);
+  if (!isNaN(date.getTime())) {
+    return date;
+  }
+  
+  // 如果解析失败，返回当前日期并打印警告
+  console.warn(`无法解析日期格式: ${dateStr}`);
+  return new Date();
+};
+
+// 格式化日期为统一格式
+const formatDate = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 const SkillAnalysis: React.FC<SkillAnalysisProps> = ({ isActive, isManualChange }) => {
   // 状态管理
@@ -44,9 +96,12 @@ const SkillAnalysis: React.FC<SkillAnalysisProps> = ({ isActive, isManualChange 
     const loadData = async () => {
       setIsLoading(true);
       try {
-        const result = await loadSampleCSVAndAnalyzeChannels(sampleDataCSV);
+        // 从缓存获取分析结果
+        const result = dataCache.getAnalysisResult();
         if (result && result.csvData) {
           processSkillAwakeningData(result.csvData);
+        } else {
+          console.error('未找到分析结果或CSV数据');
         }
       } catch (error) {
         console.error('加载技能觉醒分析数据失败:', error);
@@ -69,12 +124,16 @@ const SkillAnalysis: React.FC<SkillAnalysisProps> = ({ isActive, isManualChange 
     const dailyData = new Map<string, {
       items: {[itemId: string]: number},
       dau: number,
-      totalConsumption: number
+      totalConsumption: number,
+      originalDate: string, // 保存原始日期字符串
+      date: Date // 保存解析后的日期对象
     }>();
     
     // 处理每日数据
     skillItems.forEach(item => {
-      const dateStr = String(item['日期']);
+      const originalDateStr = String(item['日期']);
+      const parsedDate = parseDateString(originalDateStr);
+      const dateStr = formatDate(parsedDate);
       const itemId = String(item['物品名称']);
       const consumption = typeof item['天玉消耗额'] === 'number' ? item['天玉消耗额'] as number : 0;
       const dau = typeof item['DAU'] === 'number' ? item['DAU'] as number : 0;
@@ -83,7 +142,9 @@ const SkillAnalysis: React.FC<SkillAnalysisProps> = ({ isActive, isManualChange 
         dailyData.set(dateStr, {
           items: {},
           dau: dau,
-          totalConsumption: 0
+          totalConsumption: 0,
+          originalDate: originalDateStr,
+          date: parsedDate
         });
         
         // 初始化所有物品的消耗为0
@@ -103,9 +164,9 @@ const SkillAnalysis: React.FC<SkillAnalysisProps> = ({ isActive, isManualChange 
     });
     
     // 转换为数组并计算ARPU
-    const result: DailySkillConsumption[] = Array.from(dailyData.entries()).map(([date, data]) => {
+    const result: DailySkillConsumption[] = Array.from(dailyData.entries()).map(([dateStr, data]) => {
       return {
-        date,
+        date: dateStr,
         items: data.items,
         totalConsumption: data.totalConsumption,
         dau: data.dau,
@@ -113,8 +174,12 @@ const SkillAnalysis: React.FC<SkillAnalysisProps> = ({ isActive, isManualChange 
       };
     });
     
-    // 按日期排序
-    result.sort((a, b) => a.date.localeCompare(b.date));
+    // 按日期排序（使用Date对象进行比较）
+    result.sort((a, b) => {
+      const dateA = parseDateString(a.date);
+      const dateB = parseDateString(b.date);
+      return dateA.getTime() - dateB.getTime();
+    });
     
     setSkillData(result);
   };
@@ -476,34 +541,7 @@ const SkillAnalysis: React.FC<SkillAnalysisProps> = ({ isActive, isManualChange 
             />
           </div>
           
-          {/* 技能觉醒消耗数据统计卡片 */}
-          {skillStats && (
-            <div className="grid grid-cols-4 gap-4 mb-8">
-              <div className="bg-dark/40 rounded-lg p-4 text-center border border-primary/20">
-                <h4 className="text-primary font-semibold mb-2">总消耗额</h4>
-                <p className="text-light text-2xl font-bold">{skillStats.totalConsumption}</p>
-                <p className="text-light/60 text-sm">{skillStats.dateRange}</p>
-              </div>
-              
-              <div className="bg-dark/40 rounded-lg p-4 text-center border border-primary/20">
-                <h4 className="text-primary font-semibold mb-2">消耗最高物品</h4>
-                <p className="text-light text-2xl font-bold">{skillStats.topItem.name}</p>
-                <p className="text-light/60 text-sm">消耗{skillStats.topItem.value}，占比{skillStats.topItem.percentage}%</p>
-              </div>
-              
-              <div className="bg-dark/40 rounded-lg p-4 text-center border border-primary/20">
-                <h4 className="text-primary font-semibold mb-2">平均ARPU</h4>
-                <p className="text-light text-2xl font-bold">{skillStats.avgArpu}</p>
-                <p className="text-light/60 text-sm">每活跃用户天玉消耗</p>
-              </div>
-              
-              <div className="bg-dark/40 rounded-lg p-4 text-center border border-primary/20">
-                <h4 className="text-primary font-semibold mb-2">觉醒石种类</h4>
-                <p className="text-light text-2xl font-bold">5</p>
-                <p className="text-light/60 text-sm">初级/中级/高级/特级/精华</p>
-              </div>
-            </div>
-          )}
+          
         </>
       )}
       

@@ -4,6 +4,7 @@ import type { ChannelAnalysisResult } from "./dataAnalysis";
 import type { ProductConsumptionAnalysis } from "./dataAnalysis";
 import type { ProductRankingData } from "./dataAnalysis";
 import { generateConsumptionTrendChart, generatePaymentLevelCharts, generateBuyersTrendChart } from "./trendChartGenerator";
+import { dataCache } from './dataCache';
 
 /**
  * 解析CSV文件内容为数据对象数组
@@ -133,6 +134,9 @@ const generateTrendSummary = (trendAnalysisData: any): string => {
  */
 export const analyzeData = (data: CSVData[], onProgress: (progress: number) => void): Promise<AnalysisReport> => {
   return new Promise((resolve) => {
+    // 存储CSV数据到缓存
+    dataCache.setCsvData(data);
+    
     // 确保至少1秒的加载时间
     const startTime = Date.now();
     const minDuration = 1000; // 最少1秒
@@ -149,27 +153,42 @@ export const analyzeData = (data: CSVData[], onProgress: (progress: number) => v
         currentProgress = 25;
         onProgress(currentProgress);
         
-        // 步骤2: 生成总体趋势图表 (40%)
+        // 步骤2: 分析消费渠道和物品消费情况
+        const channelAnalysis = analyzeConsumptionChannels(data);
+        const itemAnalysis = analyzeItemConsumptionByUserGroup(data);
+        const productAnalysis = analyzeProductConsumption(data);
+        const productRanking = analyzeProductRanking(data, 20);
+        
+        // 存储分析结果到缓存
+        dataCache.setAnalysisResult({
+          ...channelAnalysis,
+          ...itemAnalysis,
+          productAnalysis,
+          productRanking,
+          csvData: data
+        });
+        
+        // 步骤3: 生成总体趋势图表 (40%)
         const totalTrendChart = generateConsumptionTrendChart('总体天玉消耗趋势', trendAnalysisData.total);
         currentProgress = 40;
         onProgress(currentProgress);
         
-        // 步骤3: 生成付费等级图表 (60%)
+        // 步骤4: 生成付费等级图表 (60%)
         const paymentLevelCharts = generatePaymentLevelCharts(trendAnalysisData.paymentLevels);
         currentProgress = 60;
         onProgress(currentProgress);
         
-        // 步骤4: 生成购买人数趋势图表 (75%)
+        // 步骤5: 生成购买人数趋势图表 (75%)
         const buyersTrendChart = generateBuyersTrendChart('购买人数趋势', trendAnalysisData.buyersTrend);
         currentProgress = 75;
         onProgress(currentProgress);
         
-        // 步骤5: 生成分析总结 (90%)
+        // 步骤6: 生成分析总结 (90%)
         const trendSummary = generateTrendSummary(trendAnalysisData);
         currentProgress = 90;
         onProgress(currentProgress);
         
-        // 步骤6: 构建最终报告 (95%)
+        // 步骤7: 构建最终报告 (95%)
         const report: AnalysisReport = {
           title: "天玉消耗数据分析报告",
           trends: [
@@ -262,6 +281,8 @@ export const analyzeData = (data: CSVData[], onProgress: (progress: number) => v
         resolve(report);
       } catch (error) {
         console.error('数据分析过程中发生错误:', error);
+        // 清除缓存
+        dataCache.clearCache();
         // 即使出错也返回一些基本数据
         onProgress(100);
         resolve({

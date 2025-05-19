@@ -5,9 +5,7 @@ import type { UserAnalysis as UserAnalysisType } from '../types';
 import type { EChartsOption, BarSeriesOption, LineSeriesOption, PieSeriesOption } from 'echarts';
 import { formatLargeNumber } from '../utils/dataAnalysis';
 import type { ChannelAnalysisResult, ChannelConsumptionData } from '../utils/dataAnalysis';
-import { loadSampleCSVAndAnalyzeChannels } from '../utils/csvParser';
-// 导入示例数据CSV
-import sampleDataCSV from '../assets/sample_data.csv?url';
+import { dataCache } from '../utils/dataCache';
 import Select from 'react-select';
 
 interface UserAnalysisProps {
@@ -118,44 +116,54 @@ const UserAnalysis: React.FC<UserAnalysisProps> = ({ isActive, isManualChange })
     `.trim();
   };
   
-  // 加载CSV数据
+  // 加载数据
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      // 使用csvParser中的函数加载并分析数据
-      const result = await loadSampleCSVAndAnalyzeChannels(sampleDataCSV);
-      setAnalysisResult(result);
-      
-      // 获取所有物品名称并去重
-      if (result.itemNames && result.itemNames.length > 0) {
-        const uniqueItems = Array.from(new Set(result.itemNames)).sort();
-        const options = uniqueItems.map(item => ({
-          value: item,
-          label: item
-        }));
-        setItemOptions(options);
-        
-        // 默认选择第一个物品
-        if (options.length > 0) {
-          setSelectedItem(options[0]);
-          // 加载该物品的消费数据
-          loadItemConsumptionData(options[0].value);
+      try {
+        // 从缓存获取分析结果
+        const result = dataCache.getAnalysisResult();
+        if (result) {
+          setAnalysisResult(result);
+          
+          // 获取所有物品名称并去重
+          if (result.itemNames && result.itemNames.length > 0) {
+            const uniqueItems = Array.from(new Set(result.itemNames)).sort();
+            const options = uniqueItems.map(item => ({
+              value: item,
+              label: item
+            }));
+            setItemOptions(options);
+            
+            // 默认选择第一个物品
+            if (options.length > 0) {
+              setSelectedItem(options[0]);
+              // 加载该物品的消费数据
+              loadItemConsumptionData(options[0].value);
+            }
+          } else {
+            // 如果没有物品数据，使用模拟数据
+            const mockItemOptions = [
+              { value: '至尊魔剑', label: '至尊魔剑' },
+              { value: '时空传送门', label: '时空传送门' },
+              { value: '神器防具', label: '神器防具' },
+              { value: '能量晶石', label: '能量晶石' },
+              { value: '稀有角色', label: '稀有角色' }
+            ];
+            setItemOptions(mockItemOptions);
+            setSelectedItem(mockItemOptions[0]);
+            generateMockItemConsumptionData();
+          }
+        } else {
+          console.error('未找到分析结果');
+          generateMockItemConsumptionData();
         }
-      } else {
-        // 如果没有物品数据，使用模拟数据
-        const mockItemOptions = [
-          { value: '至尊魔剑', label: '至尊魔剑' },
-          { value: '时空传送门', label: '时空传送门' },
-          { value: '神器防具', label: '神器防具' },
-          { value: '能量晶石', label: '能量晶石' },
-          { value: '稀有角色', label: '稀有角色' }
-        ];
-        setItemOptions(mockItemOptions);
-        setSelectedItem(mockItemOptions[0]);
+      } catch (error) {
+        console.error('加载数据失败:', error);
         generateMockItemConsumptionData();
+      } finally {
+        setIsLoading(false);
       }
-      
-      setIsLoading(false);
     };
     
     loadData();

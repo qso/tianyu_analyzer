@@ -3,7 +3,7 @@ import ChartComponent from './ChartComponent';
 import ReportSection from './ReportSection';
 import type { ProductAnalysis as ProductAnalysisType } from '../types';
 import type { ProductConsumptionAnalysis, ProductRankingData } from '../utils/dataAnalysis';
-import { formatLargeNumber, parseDate } from '../utils/dataAnalysis';
+import { formatLargeNumber } from '../utils/dataAnalysis';
 import type { EChartsOption, BarSeriesOption } from 'echarts';
 import { dataCache } from '../utils/dataCache';
 

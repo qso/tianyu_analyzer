@@ -39,18 +39,97 @@ export const parseCSV = (content: string): CSVData[] => {
 };
 
 /**
- * 读取CSV文件
+ * 解析CSV文件内容为数据对象数组 - 分块处理大文件
+ * @param content - CSV文件内容
+ * @param chunkSize - 每次处理的行数
+ * @param onProgress - 解析进度回调
+ * @returns Promise，解析后的数据对象数组
+ */
+export const parseCSVWithChunks = (
+  content: string,
+  chunkSize = 1000,
+  onProgress?: (progress: number) => void
+): Promise<CSVData[]> => {
+  return new Promise((resolve) => {
+    // 按行分割
+    const lines = content.split(/\r?\n/);
+    const totalLines = lines.length;
+    
+    // 解析标题行
+    const headers = lines[0].split(',').map(header => header.trim());
+    
+    // 初始化结果数组
+    const data: CSVData[] = [];
+    let processedLines = 1; // 从1开始，因为0是标题
+    
+    // 创建一个处理下一块的函数
+    const processNextChunk = () => {
+      // 计算当前块的起止位置
+      const start = processedLines;
+      const end = Math.min(processedLines + chunkSize, totalLines);
+      
+      // 处理这一块
+      for (let i = start; i < end; i++) {
+        if (!lines[i] || !lines[i].trim()) continue; // 跳过空行
+        
+        const values = lines[i].split(',').map(value => value.trim());
+        const row: CSVData = {};
+        
+        headers.forEach((header, index) => {
+          // 尝试将数值字符串转为数字
+          const value = values[index];
+          row[header] = isNaN(Number(value)) ? value : Number(value);
+        });
+        
+        data.push(row);
+      }
+      
+      // 更新已处理行数
+      processedLines = end;
+      
+      // 报告进度
+      if (onProgress) {
+        onProgress(Math.min(100, Math.round((processedLines / totalLines) * 100)));
+      }
+      
+      // 检查是否完成
+      if (processedLines >= totalLines) {
+        resolve(data);
+      } else {
+        // 使用setTimeout让UI有机会更新
+        setTimeout(processNextChunk, 0);
+      }
+    };
+    
+    // 开始处理第一块
+    processNextChunk();
+  });
+};
+
+/**
+ * 读取CSV文件 - 优化版本，使用分块处理
  * @param file - 上传的文件对象
+ * @param onProgress - 处理进度回调函数
  * @returns Promise，解析成功返回数据，失败抛出错误
  */
-export const readCSVFile = (file: File): Promise<CSVData[]> => {
+export const readCSVFile = (
+  file: File,
+  onProgress?: (progress: number) => void
+): Promise<CSVData[]> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
-        const content = event.target?.result as string;
-        const data = parseCSV(content);
+        if (!event.target || typeof event.target.result !== 'string') {
+          reject(new Error('文件读取失败'));
+          return;
+        }
+        
+        const content = event.target.result;
+        
+        // 使用分块处理CSV数据
+        const data = await parseCSVWithChunks(content, 1000, onProgress);
         resolve(data);
       } catch (error) {
         reject(new Error('CSV解析失败'));
@@ -127,13 +206,13 @@ const generateTrendSummary = (trendAnalysisData: any): string => {
 };
 
 /**
- * 分析数据过程
+ * 分析数据过程 - 优化版本
  * @param data - CSV数据
  * @param onProgress - 进度回调函数
  * @returns Promise，分析完成返回结果，失败抛出错误
  */
 export const analyzeData = (data: CSVData[], onProgress: (progress: number) => void): Promise<AnalysisReport> => {
-  return new Promise((resolve) => {
+  return new Promise(async (resolve) => {
     // 存储CSV数据到缓存
     dataCache.setCsvData(data);
     
@@ -141,167 +220,180 @@ export const analyzeData = (data: CSVData[], onProgress: (progress: number) => v
     const startTime = Date.now();
     const minDuration = 1000; // 最少1秒
     
-    // 执行任务链
-    let currentProgress = 5; // 初始进度
+    // 初始进度
+    let currentProgress = 5;
     onProgress(currentProgress);
     
-    const executeAnalysis = async () => {
-      try {
-        // 步骤1: 分析天玉消耗趋势 (25%)
-        onProgress(currentProgress);
-        const trendAnalysisData = analyzeTianYuConsumptionTrend(data);
-        currentProgress = 25;
-        onProgress(currentProgress);
-        
-        // 步骤2: 分析消费渠道和物品消费情况
-        const channelAnalysis = analyzeConsumptionChannels(data);
-        const itemAnalysis = analyzeItemConsumptionByUserGroup(data);
-        const productAnalysis = analyzeProductConsumption(data);
-        const productRanking = analyzeProductRanking(data, 20);
-        
-        // 存储分析结果到缓存
-        dataCache.setAnalysisResult({
-          ...channelAnalysis,
-          ...itemAnalysis,
-          productAnalysis,
-          productRanking,
-          csvData: data
-        });
-        
-        // 步骤3: 生成总体趋势图表 (40%)
-        const totalTrendChart = generateConsumptionTrendChart('总体天玉消耗趋势', trendAnalysisData.total);
-        currentProgress = 40;
-        onProgress(currentProgress);
-        
-        // 步骤4: 生成付费等级图表 (60%)
-        const paymentLevelCharts = generatePaymentLevelCharts(trendAnalysisData.paymentLevels);
-        currentProgress = 60;
-        onProgress(currentProgress);
-        
-        // 步骤5: 生成购买人数趋势图表 (75%)
-        const buyersTrendChart = generateBuyersTrendChart('购买人数趋势', trendAnalysisData.buyersTrend);
-        currentProgress = 75;
-        onProgress(currentProgress);
-        
-        // 步骤6: 生成分析总结 (90%)
-        const trendSummary = generateTrendSummary(trendAnalysisData);
-        currentProgress = 90;
-        onProgress(currentProgress);
-        
-        // 步骤7: 构建最终报告 (95%)
-        const report: AnalysisReport = {
-          title: "天玉消耗数据分析报告",
-          trends: [
-            { 
-              id: "total-consumption", 
-              title: "总体天玉消耗趋势", 
-              data: {
-                chartOption: totalTrendChart,
-                rawData: trendAnalysisData.total,
-                summary: trendSummary
-              }
-            },
-            { 
-              id: "tuhao-consumption", 
-              title: "土豪付费区间天玉消耗趋势", 
-              data: {
-                chartOption: paymentLevelCharts['土豪'],
-                rawData: trendAnalysisData.paymentLevels['土豪']
-              }
-            },
-            { 
-              id: "bigr-consumption", 
-              title: "大R付费区间天玉消耗趋势", 
-              data: {
-                chartOption: paymentLevelCharts['大R'],
-                rawData: trendAnalysisData.paymentLevels['大R']
-              }
-            },
-            { 
-              id: "midr-consumption", 
-              title: "中R付费区间天玉消耗趋势", 
-              data: {
-                chartOption: paymentLevelCharts['中R'],
-                rawData: trendAnalysisData.paymentLevels['中R']
-              }
-            },
-            { 
-              id: "smallr-consumption", 
-              title: "小R付费区间天玉消耗趋势", 
-              data: {
-                chartOption: paymentLevelCharts['小R'],
-                rawData: trendAnalysisData.paymentLevels['小R']
-              }
-            },
-            { 
-              id: "free-consumption", 
-              title: "平民付费区间天玉消耗趋势", 
-              data: {
-                chartOption: paymentLevelCharts['平民'],
-                rawData: trendAnalysisData.paymentLevels['平民']
-              }
-            },
-            { 
-              id: "buyers-trend", 
-              title: "购买人数趋势", 
-              data: {
-                chartOption: buyersTrendChart,
-                rawData: trendAnalysisData.buyersTrend
-              }
+    try {
+      // 使用分块处理的方式执行分析任务
+      // 步骤1: 分析天玉消耗趋势 (25%)
+      await new Promise(r => setTimeout(r, 50)); // 小延迟，让UI更新
+      onProgress(10);
+      
+      const trendAnalysisData = analyzeTianYuConsumptionTrend(data);
+      currentProgress = 25;
+      onProgress(currentProgress);
+      
+      // 步骤2: 分析消费渠道和物品消费情况
+      await new Promise(r => setTimeout(r, 50)); // 小延迟，让UI更新
+      const channelAnalysis = analyzeConsumptionChannels(data);
+      currentProgress = 35;
+      onProgress(currentProgress);
+      
+      await new Promise(r => setTimeout(r, 50)); // 小延迟，让UI更新
+      const itemAnalysis = analyzeItemConsumptionByUserGroup(data);
+      currentProgress = 45;
+      onProgress(currentProgress);
+      
+      await new Promise(r => setTimeout(r, 50)); // 小延迟，让UI更新
+      const productAnalysis = analyzeProductConsumption(data);
+      currentProgress = 55;
+      onProgress(currentProgress);
+      
+      await new Promise(r => setTimeout(r, 50)); // 小延迟，让UI更新
+      const productRanking = analyzeProductRanking(data, 20);
+      currentProgress = 65;
+      onProgress(currentProgress);
+      
+      // 存储分析结果到缓存
+      dataCache.setAnalysisResult({
+        ...channelAnalysis,
+        ...itemAnalysis,
+        productAnalysis,
+        productRanking,
+        csvData: data
+      });
+      
+      // 步骤3: 生成各种图表
+      await new Promise(r => setTimeout(r, 50)); // 小延迟，让UI更新
+      const totalTrendChart = generateConsumptionTrendChart('总体天玉消耗趋势', trendAnalysisData.total);
+      currentProgress = 75;
+      onProgress(currentProgress);
+      
+      await new Promise(r => setTimeout(r, 50)); // 小延迟，让UI更新
+      const paymentLevelCharts = generatePaymentLevelCharts(trendAnalysisData.paymentLevels);
+      currentProgress = 85;
+      onProgress(currentProgress);
+      
+      await new Promise(r => setTimeout(r, 50)); // 小延迟，让UI更新
+      const buyersTrendChart = generateBuyersTrendChart('购买人数趋势', trendAnalysisData.buyersTrend);
+      currentProgress = 90;
+      onProgress(currentProgress);
+      
+      // 步骤4: 生成分析总结
+      await new Promise(r => setTimeout(r, 50)); // 小延迟，让UI更新
+      const trendSummary = generateTrendSummary(trendAnalysisData);
+      currentProgress = 95;
+      onProgress(currentProgress);
+      
+      // 构建最终报告
+      const report: AnalysisReport = {
+        title: "天玉消耗数据分析报告",
+        trends: [
+          { 
+            id: "total-consumption", 
+            title: "总体天玉消耗趋势", 
+            data: {
+              chartOption: totalTrendChart,
+              rawData: trendAnalysisData.total,
+              summary: trendSummary
             }
-          ],
-          users: [
-            { id: "user1", title: "用户分析 1", data: { /* 分析数据 */ } }
-          ],
-          products: [
-            { id: "product1", title: "商品分析 1", data: { /* 分析数据 */ } }
-          ],
-          skills: [
-            { id: "skill1", title: "技能觉醒分析", data: { /* 分析数据 */ } }
-          ],
-          summary: {
-            id: "summary",
-            title: "总结与建议",
-            content: trendSummary
+          },
+          { 
+            id: "tuhao-consumption", 
+            title: "土豪付费区间天玉消耗趋势", 
+            data: {
+              chartOption: paymentLevelCharts['土豪'],
+              rawData: trendAnalysisData.paymentLevels['土豪']
+            }
+          },
+          { 
+            id: "bigr-consumption", 
+            title: "大R付费区间天玉消耗趋势", 
+            data: {
+              chartOption: paymentLevelCharts['大R'],
+              rawData: trendAnalysisData.paymentLevels['大R']
+            }
+          },
+          { 
+            id: "midr-consumption", 
+            title: "中R付费区间天玉消耗趋势", 
+            data: {
+              chartOption: paymentLevelCharts['中R'],
+              rawData: trendAnalysisData.paymentLevels['中R']
+            }
+          },
+          { 
+            id: "smallr-consumption", 
+            title: "小R付费区间天玉消耗趋势", 
+            data: {
+              chartOption: paymentLevelCharts['小R'],
+              rawData: trendAnalysisData.paymentLevels['小R']
+            }
+          },
+          { 
+            id: "free-consumption", 
+            title: "平民付费区间天玉消耗趋势", 
+            data: {
+              chartOption: paymentLevelCharts['平民'],
+              rawData: trendAnalysisData.paymentLevels['平民']
+            }
+          },
+          { 
+            id: "buyers-trend", 
+            title: "购买人数趋势", 
+            data: {
+              chartOption: buyersTrendChart,
+              rawData: trendAnalysisData.buyersTrend
+            }
           }
-        };
-        currentProgress = 95;
-        onProgress(currentProgress);
-        
-        // 确保至少持续minDuration的时间
-        const endTime = Date.now();
-        const elapsed = endTime - startTime;
-        
-        if (elapsed < minDuration) {
-          await new Promise(r => setTimeout(r, minDuration - elapsed));
+        ],
+        users: [
+          { id: "user1", title: "用户分析 1", data: { /* 分析数据 */ } }
+        ],
+        products: [
+          { id: "product1", title: "商品分析 1", data: { /* 分析数据 */ } }
+        ],
+        skills: [
+          { id: "skill1", title: "技能觉醒分析", data: { /* 分析数据 */ } }
+        ],
+        summary: {
+          id: "summary",
+          title: "总结与建议",
+          content: trendSummary
         }
-        
-        // 最终进度
-        onProgress(100);
-        resolve(report);
-      } catch (error) {
-        console.error('数据分析过程中发生错误:', error);
-        // 清除缓存
-        dataCache.clearCache();
-        // 即使出错也返回一些基本数据
-        onProgress(100);
-        resolve({
-          title: "分析报告（处理过程中出现错误）",
-          trends: [],
-          users: [],
-          products: [],
-          skills: [],
-          summary: {
-            id: "summary",
-            title: "分析过程中出现错误",
-            content: "数据处理过程中发生错误，请尝试重新上传文件或联系技术支持。"
-          }
-        });
+      };
+      
+      // 确保至少持续minDuration的时间
+      const endTime = Date.now();
+      const elapsed = endTime - startTime;
+      
+      if (elapsed < minDuration) {
+        await new Promise(r => setTimeout(r, minDuration - elapsed));
       }
-    };
-    
-    // 启动分析过程
-    executeAnalysis();
+      
+      // 最终进度
+      onProgress(100);
+      resolve(report);
+    } catch (error) {
+      console.error('数据分析过程中发生错误:', error);
+      // 清除缓存
+      dataCache.clearCache();
+      // 即使出错也返回一些基本数据
+      onProgress(100);
+      resolve({
+        title: "分析报告（处理过程中出现错误）",
+        trends: [],
+        users: [],
+        products: [],
+        skills: [],
+        summary: {
+          id: "summary",
+          title: "分析过程中出现错误",
+          content: "数据处理过程中发生错误，请尝试重新上传文件或联系技术支持。"
+        }
+      });
+    }
   });
 };
 

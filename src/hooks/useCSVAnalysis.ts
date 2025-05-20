@@ -45,11 +45,15 @@ export const useCSVAnalysis = (): UseCSVAnalysisReturn => {
       setStatus(AnalysisStatus.LOADING);
       
       // 读取CSV文件
-      const data: CSVData[] = await readCSVFile(file);
+      const data: CSVData[] = await readCSVFile(file, (p) => {
+        // CSV解析进度占总进度的30%
+        setProgress(Math.floor(p * 0.3));
+      });
       
       // 分析数据
       const result = await analyzeData(data, (p) => {
-        setProgress(p);
+        // 数据分析进度从30%到100%
+        setProgress(30 + Math.floor(p * 0.7));
       });
       
       // 更新分析结果

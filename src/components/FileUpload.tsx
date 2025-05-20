@@ -91,6 +91,15 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, disabled = false 
         或点击下方按钮选择文件
       </motion.p>
       
+      <motion.p 
+        className="mb-6 text-xs text-amber-400/80"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.5 }}
+      >
+        提示：大文件（{'>'}1MB）可能需要更长处理时间，请耐心等待
+      </motion.p>
+      
       <motion.button
         className="tech-button animate-glow"
         onClick={handleButtonClick}

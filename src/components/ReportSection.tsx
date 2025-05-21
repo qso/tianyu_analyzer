@@ -9,7 +9,8 @@ interface ReportSectionProps {
   isManualChange?: boolean; // 添加是否为主动切换的标志
 }
 
-const ReportSection: React.FC<ReportSectionProps> = React.memo(({ id, title, children, isActive, isManualChange = false }) => {
+// 移除React.memo优化，允许children变化时重新渲染
+const ReportSection: React.FC<ReportSectionProps> = ({ id, title, children, isActive, isManualChange = false }) => {
   const sectionRef = useRef<HTMLDivElement>(null);
   const lastIntersectionTime = useRef<number>(0);
 
@@ -81,6 +82,7 @@ const ReportSection: React.FC<ReportSectionProps> = React.memo(({ id, title, chi
     };
   }, [id, isActive]);
 
+  // 禁用framer-motion的once选项，允许重复动画
   return (
     <motion.section
       id={id}
@@ -88,7 +90,7 @@ const ReportSection: React.FC<ReportSectionProps> = React.memo(({ id, title, chi
       className="card mb-10"
       initial={{ opacity: 0, y: 50 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-100px 0px" }}
+      viewport={{ once: false, margin: "-100px 0px" }} 
       transition={{ duration: 0.5 }}
       data-section-id={id}
     >
@@ -98,14 +100,6 @@ const ReportSection: React.FC<ReportSectionProps> = React.memo(({ id, title, chi
       {children}
     </motion.section>
   );
-}, (prevProps, nextProps) => {
-  // 只有当id、isActive或isManualChange发生变化时才重新渲染
-  return (
-    prevProps.id === nextProps.id &&
-    prevProps.isActive === nextProps.isActive &&
-    prevProps.isManualChange === nextProps.isManualChange &&
-    prevProps.title === nextProps.title
-  );
-});
+};
 
 export default ReportSection; 

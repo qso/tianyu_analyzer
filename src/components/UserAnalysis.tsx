@@ -98,9 +98,9 @@ const UserAnalysis: React.FC<UserAnalysisProps> = ({ isActive, isManualChange })
     return `
       <p>用户消费分析显示，<span class="text-yellow-200 font-bold">${sortedConsumption[0].userGroup}</span>和<span class="text-yellow-200 font-bold">${sortedConsumption[1].userGroup}</span>用户群体贡献了最高的消费总额，分别为<span class="text-orange-500 font-bold">${formatLargeNumber(sortedConsumption[0].totalConsumption)}</span>和<span class="text-orange-500 font-bold">${formatLargeNumber(sortedConsumption[1].totalConsumption)}</span>天玉，占总消费的<span class="text-orange-500 font-bold">${((sortedConsumption[0].totalConsumption + sortedConsumption[1].totalConsumption) / totalAllConsumption * 100).toFixed(1)}%</span>。</p>
       
-      <p>从人均消费来看，<span class="text-yellow-200 font-bold">${sortedAvgConsumption[0].userGroup}</span>用户的人均消费最高，达到<span class="text-orange-500 font-bold">${sortedAvgConsumption[0].avgConsumption.toFixed(0)}</span>天玉，显示出极高的付费意愿和能力。<span class="text-yellow-200 font-bold">${sortedAvgConsumption[1].userGroup}</span>用户次之，人均<span class="text-orange-500 font-bold">${sortedAvgConsumption[1].avgConsumption.toFixed(0)}</span>天玉。</p>
+      <p>从人次消费来看，<span class="text-yellow-200 font-bold">${sortedAvgConsumption[0].userGroup}</span>用户的人次消费最高，达到<span class="text-orange-500 font-bold">${sortedAvgConsumption[0].avgConsumption.toFixed(0)}</span>天玉，显示出极高的付费意愿和能力。<span class="text-yellow-200 font-bold">${sortedAvgConsumption[1].userGroup}</span>用户次之，人均<span class="text-orange-500 font-bold">${sortedAvgConsumption[1].avgConsumption.toFixed(0)}</span>天玉。</p>
       
-      <p>购买人数方面，<span class="text-yellow-200 font-bold">${sortedUserCount[0].userGroup}</span>和<span class="text-yellow-200 font-bold">${sortedUserCount[1].userGroup}</span>用户群体人数最多，分别有<span class="text-blue-500 font-bold">${formatLargeNumber(sortedUserCount[0].userCount)}</span>和<span class="text-blue-500 font-bold">${formatLargeNumber(sortedUserCount[1].userCount)}</span>人。这表明虽然<span class="text-yellow-200 font-bold">${sortedUserCount[0].userGroup}</span>用户的人均消费较低，但基数大，仍然贡献了可观的消费总额。</p>
+      <p>购买人数方面，<span class="text-yellow-200 font-bold">${sortedUserCount[0].userGroup}</span>和<span class="text-yellow-200 font-bold">${sortedUserCount[1].userGroup}</span>用户群体人数最多，分别有<span class="text-blue-500 font-bold">${formatLargeNumber(sortedUserCount[0].userCount)}</span>和<span class="text-blue-500 font-bold">${formatLargeNumber(sortedUserCount[1].userCount)}</span>人。这表明虽然<span class="text-yellow-200 font-bold">${sortedUserCount[0].userGroup}</span>用户的人次消费较低，但基数大，仍然贡献了可观的消费总额。</p>
       
       <p>消费渠道分析显示，<span class="text-blue-500 font-bold">${sortedChannels[0]}</span>和<span class="text-blue-500 font-bold">${sortedChannels[1]}</span>是主要消费渠道，总消费额分别为<span class="text-orange-500 font-bold">${formatLargeNumber(channelTotals[sortedChannels[0]])}</span>和<span class="text-orange-500 font-bold">${formatLargeNumber(channelTotals[sortedChannels[1]])}</span>天玉。尤其在<span class="text-yellow-200 font-bold">${sortedConsumption[0].userGroup}</span>群体中，<span class="text-blue-500 font-bold">${sortedChannels[0]}</span>渠道占比达<span class="text-orange-500 font-bold">${((sortedConsumption[0].channelData[sortedChannels[0]] || 0) / sortedConsumption[0].totalConsumption * 100).toFixed(1)}%</span>。</p>
       
@@ -275,7 +275,7 @@ const UserAnalysis: React.FC<UserAnalysisProps> = ({ isActive, isManualChange })
 
     // 定义线图系列
     const lineSeries: LineSeriesOption = {
-      name: '人均消费',
+      name: '人次消费',
       type: 'line',
       yAxisIndex: 1,
       data: avgConsumptionData,
@@ -337,7 +337,7 @@ const UserAnalysis: React.FC<UserAnalysisProps> = ({ isActive, isManualChange })
           // 处理线图数据
           const lineParams = params[params.length - 1];
           if (lineParams && lineParams.componentSubType === 'line') {
-            result += `${lineParams.marker} 人均消费: <b>${lineParams.value}</b> 天玉`;
+            result += `${lineParams.marker} 人次消费: <b>${lineParams.value}</b> 天玉`;
           }
           
           return result;
@@ -349,7 +349,7 @@ const UserAnalysis: React.FC<UserAnalysisProps> = ({ isActive, isManualChange })
         }
       },
       legend: {
-        data: [...channels, '人均消费'],
+        data: [...channels, '人次消费'],
         top: 30,
         textStyle: {
           color: '#ffffff'
@@ -388,7 +388,7 @@ const UserAnalysis: React.FC<UserAnalysisProps> = ({ isActive, isManualChange })
         },
         {
           type: 'value',
-          name: '人均消费(天玉)',
+          name: '人次消费(天玉)',
           min: 0,
           max: Math.max(...avgConsumptionData) * 1.2 || 2000,
           axisLabel: {
@@ -447,7 +447,7 @@ const UserAnalysis: React.FC<UserAnalysisProps> = ({ isActive, isManualChange })
     
     return {
       title: {
-        text: '不同人群购买人数分析',
+        text: '不同人群购买人次分析',
         left: 'center',
         top: 0,
         textStyle: {

@@ -49,19 +49,6 @@ const App: React.FC = () => {
     }
   }, [isReportScreen]);
   
-  // 处理section-visible事件，实现双向锚定
-  const handleSectionVisible = useCallback((event: Event) => {
-    const customEvent = event as CustomEvent;
-    // 如果滚动锁定标志为true，则忽略滚动事件
-    if (scrollLockRef.current) return;
-    
-    if (customEvent.detail && customEvent.detail.id) {
-      // 被动改变导航项
-      isManualChangeRef.current = false;
-      setActiveSection(customEvent.detail.id);
-    }
-  }, []);
-  
   // 处理点击导航项
   const handleNavItemClick = useCallback((id: string) => {
     // 主动点击导航项
@@ -76,27 +63,104 @@ const App: React.FC = () => {
       window.clearTimeout(scrollLockTimerRef.current);
     }
     
-    // 设置定时器，1秒后解锁（滚动动画大约需要这么长时间）
+    // 设置定时器，300毫秒后解锁（缩短滚动动画的锁定时间）
     scrollLockTimerRef.current = window.setTimeout(() => {
       scrollLockRef.current = false;
       scrollLockTimerRef.current = null;
-    }, 1000);
+    }, 300); // 缩短锁定时间
   }, []);
   
-  // 添加和移除事件监听器
+  // 简化的导航激活逻辑：基于视口中心的距离
+  const updateActiveSection = useCallback(() => {
+    // 如果滚动锁定标志为true，则忽略滚动事件
+    if (scrollLockRef.current) return;
+    
+    // 获取所有部分
+    const sections = navItems.map(item => {
+      const element = document.getElementById(item.id);
+      if (!element) return null;
+      
+      const rect = element.getBoundingClientRect();
+      // 计算元素中心点到视口中心的距离
+      const viewportCenter = window.innerHeight / 2;
+      const elementCenter = rect.top + rect.height / 2;
+      const distance = Math.abs(elementCenter - viewportCenter);
+      
+      return {
+        id: item.id,
+        distance,
+        isVisible: rect.top < window.innerHeight && rect.bottom > 0,
+        rect
+      };
+    }).filter(Boolean);
+    
+    // 特殊处理最后一个板块（summary）
+    const summarySection = sections.find(s => s?.id === 'summary');
+    
+    // 如果summary的顶部可见且超过100像素，则激活它
+    if (summarySection && summarySection.isVisible && summarySection.rect.top < window.innerHeight - 100) {
+      isManualChangeRef.current = false;
+      setActiveSection('summary');
+      return;
+    }
+    
+    // 否则，选择视口中心点距离最近的可见区域
+    const closestSection = sections
+      .filter(s => s?.isVisible)
+      .sort((a, b) => a!.distance - b!.distance)[0];
+    
+    if (closestSection) {
+      isManualChangeRef.current = false;
+      setActiveSection(closestSection.id);
+    }
+  }, []);
+  
+  // 添加滚动监听
   useEffect(() => {
     if (isReportScreen) {
-      document.addEventListener('section-visible', handleSectionVisible);
+      // 添加简化的滚动监听器
+      const handleScroll = () => {
+        updateActiveSection();
+      };
+      
+      // 添加滚动事件监听，使用节流减少调用频率
+      let throttleTimer: number | null = null;
+      const throttledScroll = () => {
+        if (throttleTimer === null) {
+          throttleTimer = window.setTimeout(() => {
+            handleScroll();
+            throttleTimer = null;
+          }, 100);
+        }
+      };
+      
+      // 初始检查
+      setTimeout(updateActiveSection, 500);
+      
+      window.addEventListener('scroll', throttledScroll, { passive: true });
+      // 添加resize事件监听，在窗口大小变化时也更新激活项
+      window.addEventListener('resize', throttledScroll, { passive: true });
+      
+      return () => {
+        window.removeEventListener('scroll', throttledScroll);
+        window.removeEventListener('resize', throttledScroll);
+        if (throttleTimer) {
+          window.clearTimeout(throttleTimer);
+        }
+        // 清除定时器
+        if (scrollLockTimerRef.current !== null) {
+          window.clearTimeout(scrollLockTimerRef.current);
+        }
+      };
     }
     
     return () => {
-      document.removeEventListener('section-visible', handleSectionVisible);
       // 清除定时器
       if (scrollLockTimerRef.current !== null) {
         window.clearTimeout(scrollLockTimerRef.current);
       }
     };
-  }, [isReportScreen, handleSectionVisible]);
+  }, [isReportScreen, updateActiveSection]);
   
   return (
     <div className="min-h-screen">
@@ -275,3 +339,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+
